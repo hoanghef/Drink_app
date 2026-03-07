@@ -7,6 +7,7 @@ import '../themes.dart';
 import '../widgets/custom_button.dart';
 import 'main_screen.dart';
 import 'sign_up_screen.dart';
+import 'admin/admin_main_screen.dart'; // Thêm import AdminMainScreen
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -142,6 +143,8 @@ class _SignInScreenState extends State<SignInScreen> {
           listen: false,
         ).loadUserData(userCredential.user!.uid);
 
+        if (!mounted) return;
+
         // Load favorites
         await Provider.of<FavoritesProvider>(
           context,
@@ -150,14 +153,43 @@ class _SignInScreenState extends State<SignInScreen> {
       }
 
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainScreen()),
-        );
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        if (userProvider.isAdmin) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminMainScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainScreen()),
+          );
+        }
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
-        _errorMessage = e.message ?? 'Đã xảy ra lỗi';
+        switch (e.code) {
+          case 'invalid-email':
+            _errorMessage = 'Email không hợp lệ.';
+            break;
+          case 'user-disabled':
+            _errorMessage = 'Tài khoản đã bị vô hiệu hóa.';
+            break;
+          case 'user-not-found':
+            _errorMessage = 'Không tìm thấy tài khoản với email này.';
+            break;
+          case 'wrong-password':
+            _errorMessage = 'Mật khẩu không chính xác.';
+            break;
+          case 'invalid-credential':
+            _errorMessage = 'Email hoặc mật khẩu không chính xác.';
+            break;
+          case 'too-many-requests':
+            _errorMessage = 'Quá nhiều yêu cầu. Vui lòng thử lại sau.';
+            break;
+          default:
+            _errorMessage = 'Đã xảy ra lỗi: ${e.message}';
+        }
       });
     } finally {
       if (mounted) {

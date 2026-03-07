@@ -324,7 +324,7 @@ class OrderHistoryScreen extends StatelessWidget {
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
 
                   const Divider(),
 

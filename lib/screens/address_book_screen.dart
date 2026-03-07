@@ -45,7 +45,7 @@ class AddressBookScreen extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppThemes.primaryColor.withOpacity(0.1),
+                          color: AppThemes.primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(

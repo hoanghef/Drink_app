@@ -44,17 +44,31 @@ class _DetailScreenState extends State<DetailScreen> {
             color: AppThemes.secondaryColor, // Fallback color
             child: Hero(
               tag: widget.product.id,
-              child: Image.asset(
-                widget.product.imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const Center(
-                  child: Icon(
-                    Icons.coffee,
-                    size: 50,
-                    color: AppThemes.primaryColor,
-                  ),
-                ),
-              ),
+              child: widget.product.imageUrl.startsWith('http')
+                  ? Image.network(
+                      widget.product.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Center(
+                            child: Icon(
+                              Icons.coffee,
+                              size: 50,
+                              color: AppThemes.primaryColor,
+                            ),
+                          ),
+                    )
+                  : Image.asset(
+                      widget.product.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Center(
+                            child: Icon(
+                              Icons.coffee,
+                              size: 50,
+                              color: AppThemes.primaryColor,
+                            ),
+                          ),
+                    ),
             ),
           ),
 
@@ -184,7 +198,7 @@ class _DetailScreenState extends State<DetailScreen> {
                             ),
                             borderRadius: BorderRadius.circular(12),
                             color: isSelected
-                                ? AppThemes.primaryColor.withOpacity(0.1)
+                                ? AppThemes.primaryColor.withValues(alpha: 0.1)
                                 : Colors.white,
                           ),
                           child: Text(
