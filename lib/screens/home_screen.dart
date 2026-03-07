@@ -19,6 +19,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String? selectedCategory;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -27,6 +29,12 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<CategoryProvider>(context, listen: false).loadCategories();
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -104,8 +112,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value.toLowerCase();
+                      });
+                    },
                     decoration: InputDecoration(
-                      hintText: 'Search coffee',
+                      hintText: 'Tìm kiếm cà phê...',
                       prefixIcon: const Icon(
                         IconlyLight.search,
                         color: Colors.white,
@@ -138,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 10,
                           offset: const Offset(0, 5),
                         ),
@@ -205,9 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       final categories = categoryProvider.categories;
 
                       // Set initial selected category to "all"
-                      if (selectedCategory == null) {
-                        selectedCategory = 'all';
-                      }
+                      selectedCategory ??= 'all';
 
                       return SizedBox(
                         height: 40,
@@ -238,7 +250,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                     boxShadow: [
                                       if (!isSelected)
                                         BoxShadow(
-                                          color: Colors.grey.withOpacity(0.1),
+                                          color: Colors.grey.withValues(
+                                            alpha: 0.1,
+                                          ),
                                           blurRadius: 4,
                                           offset: const Offset(0, 2),
                                         ),
@@ -283,7 +297,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   boxShadow: [
                                     if (!isSelected)
                                       BoxShadow(
-                                        color: Colors.grey.withOpacity(0.1),
+                                        color: Colors.grey.withValues(
+                                          alpha: 0.1,
+                                        ),
                                         blurRadius: 4,
                                         offset: const Offset(0, 2),
                                       ),
@@ -335,10 +351,23 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
                         }
                         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return const Center(child: Text('No products found'));
+                          return const Center(child: Text('Chưa có sản phẩm'));
                         }
 
                         final productsList = snapshot.data!;
+                        // Filter by search query
+                        final filteredProducts = productsList.where((product) {
+                          return product.name.toLowerCase().contains(
+                            _searchQuery,
+                          );
+                        }).toList();
+
+                        if (filteredProducts.isEmpty) {
+                          return const Center(
+                            child: Text('Không tìm thấy sản phẩm'),
+                          );
+                        }
+
                         return GridView.builder(
                           padding: const EdgeInsets.only(bottom: 20),
                           gridDelegate:
@@ -348,9 +377,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 crossAxisSpacing: 16,
                                 mainAxisSpacing: 16,
                               ),
-                          itemCount: productsList.length,
+                          itemCount: filteredProducts.length,
                           itemBuilder: (context, index) {
-                            final product = productsList[index];
+                            final product = filteredProducts[index];
                             return ProductCard(
                               product: product,
                               onTap: () {

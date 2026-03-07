@@ -6,6 +6,7 @@ class Product {
   final String imageUrl;
   final double rating;
   final String category;
+  final bool isAvailable;
 
   Product({
     required this.id,
@@ -15,6 +16,7 @@ class Product {
     required this.imageUrl,
     required this.rating,
     required this.category,
+    this.isAvailable = true,
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +28,7 @@ class Product {
       'imageUrl': imageUrl,
       'rating': rating,
       'category': category,
+      'isAvailable': isAvailable,
     };
   }
 
@@ -38,6 +41,7 @@ class Product {
       imageUrl: map['imageURL'] ?? '',
       rating: (map['rating'] ?? 0).toDouble(),
       category: map['category'] ?? map['type'] ?? '', // Backward compatibility
+      isAvailable: map['isAvailable'] ?? true,
     );
   }
 }

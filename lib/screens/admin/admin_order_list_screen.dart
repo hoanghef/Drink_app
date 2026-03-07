@@ -1,13 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../themes.dart';
 import 'package:intl/intl.dart';
+import '../../themes.dart';
+import 'admin_order_detail_screen.dart';
 
-class OrderHistoryScreen extends StatelessWidget {
-  const OrderHistoryScreen({super.key});
+class AdminOrderListScreen extends StatelessWidget {
+  const AdminOrderListScreen({super.key});
 
-  // Format currency in Vietnamese style: 160.000đ
   String formatCurrency(double amount) {
     final formatter = NumberFormat('#,##0', 'vi_VN');
     return '${formatter.format(amount)}đ';
@@ -15,19 +14,10 @@ class OrderHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Order History')),
-        body: const Center(child: Text('Please login to view orders')),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Lịch sử đơn hàng',
+          'Quản lý Đơn hàng',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -35,7 +25,6 @@ class OrderHistoryScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('orders')
-            .where('userId', isEqualTo: user.uid)
             .orderBy('createdAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
@@ -44,7 +33,7 @@ class OrderHistoryScreen extends StatelessWidget {
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text('Lỗi: ${snapshot.error}'));
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -76,7 +65,7 @@ class OrderHistoryScreen extends StatelessWidget {
               final orderData = orders[index].data() as Map<String, dynamic>;
               final orderId = orders[index].id;
               final amount = orderData['amount'] ?? 0.0;
-              final status = orderData['status'] ?? 'Processing';
+              final status = orderData['status'] ?? 'processing';
               final isDelivery = orderData['isDelivery'] ?? true;
               final items = orderData['items'] as List<dynamic>? ?? [];
               final timestamp = orderData['createdAt'] as Timestamp?;
@@ -86,7 +75,15 @@ class OrderHistoryScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(bottom: 12),
                 child: InkWell(
                   onTap: () {
-                    _showOrderDetails(context, orderData, orderId);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AdminOrderDetailScreen(
+                          orderId: orderId,
+                          orderData: orderData,
+                        ),
+                      ),
+                    );
                   },
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -98,7 +95,7 @@ class OrderHistoryScreen extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Order #${orderId.substring(0, 8)}',
+                              'Đơn #${orderId.substring(0, 8)}',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
@@ -187,21 +184,39 @@ class OrderHistoryScreen extends StatelessWidget {
   Widget _buildStatusChip(String status) {
     Color backgroundColor;
     Color textColor;
+    String displayStatus;
 
-    switch (status.toLowerCase()) {
-      case 'completed':
-        backgroundColor = Colors.green.shade100;
-        textColor = Colors.green.shade800;
-        break;
-      case 'processing':
+    switch (status) {
+      case 'Chờ xác nhận':
+      case 'processing': // Fallback for old orders
+        displayStatus = 'Chờ xác nhận';
         backgroundColor = Colors.orange.shade100;
         textColor = Colors.orange.shade800;
         break;
-      case 'cancelled':
+      case 'Đang pha chế':
+        displayStatus = 'Đang pha chế';
+        backgroundColor = Colors.blue.shade100;
+        textColor = Colors.blue.shade800;
+        break;
+      case 'Đang giao':
+        displayStatus = 'Đang giao';
+        backgroundColor = Colors.purple.shade100;
+        textColor = Colors.purple.shade800;
+        break;
+      case 'Hoàn thành':
+      case 'completed': // Fallback
+        displayStatus = 'Hoàn thành';
+        backgroundColor = Colors.green.shade100;
+        textColor = Colors.green.shade800;
+        break;
+      case 'Hủy':
+      case 'cancelled': // Fallback
+        displayStatus = 'Hủy';
         backgroundColor = Colors.red.shade100;
         textColor = Colors.red.shade800;
         break;
       default:
+        displayStatus = status;
         backgroundColor = Colors.grey.shade100;
         textColor = Colors.grey.shade800;
     }
@@ -213,146 +228,11 @@ class OrderHistoryScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        status,
+        displayStatus,
         style: TextStyle(
           color: textColor,
           fontWeight: FontWeight.bold,
           fontSize: 12,
-        ),
-      ),
-    );
-  }
-
-  void _showOrderDetails(
-    BuildContext context,
-    Map<String, dynamic> orderData,
-    String orderId,
-  ) {
-    final items = orderData['items'] as List<dynamic>? ?? [];
-    final amount = orderData['amount'] ?? 0.0;
-    final deliveryAddress =
-        orderData['deliveryAddress'] as Map<String, dynamic>?;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Chi tiết đơn hàng',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(),
-
-            // Content
-            Expanded(
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.all(16),
-                children: [
-                  // Delivery Address
-                  if (deliveryAddress != null) ...[
-                    const Text(
-                      'Địa chỉ giao hàng',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(deliveryAddress['fullAddress'] ?? ''),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Items
-                  const Text(
-                    'Sản phẩm',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 8),
-                  ...items.map((item) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item['productName'] ?? '',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                Text(
-                                  'Size: ${item['size']} | x${item['quantity']}',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            formatCurrency(item['price'] * item['quantity']),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-
-                  const Divider(),
-
-                  // Total
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Tổng cộng',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      Text(
-                        formatCurrency(amount),
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          color: AppThemes.primaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );

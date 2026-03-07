@@ -8,6 +8,7 @@ import '../providers/favorites_provider.dart';
 import '../themes.dart';
 import '../widgets/custom_button.dart';
 import 'main_screen.dart';
+import 'admin/admin_main_screen.dart'; // import AdminMainScreen
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -114,6 +115,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           listen: false,
         ).loadUserData(user.uid);
 
+        if (!mounted) return;
+
         // Load favorites
         await Provider.of<FavoritesProvider>(
           context,
@@ -122,14 +125,41 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
 
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainScreen()),
-        );
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        if (userProvider.isAdmin) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminMainScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainScreen()),
+          );
+        }
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
-        _errorMessage = e.message ?? 'Đã xảy ra lỗi';
+        switch (e.code) {
+          case 'email-already-in-use':
+            _errorMessage = 'Email này đã được sử dụng cho tài khoản khác.';
+            break;
+          case 'invalid-email':
+            _errorMessage = 'Email không hợp lệ.';
+            break;
+          case 'weak-password':
+            _errorMessage =
+                'Mật khẩu quá yếu. Vui lòng nhập mật khẩu mạnh hơn.';
+            break;
+          case 'operation-not-allowed':
+            _errorMessage = 'Hệ thống hiện không cho phép đăng ký mới.';
+            break;
+          case 'too-many-requests':
+            _errorMessage = 'Quá nhiều yêu cầu. Vui lòng thử lại sau.';
+            break;
+          default:
+            _errorMessage = 'Đã xảy ra lỗi: ${e.message}';
+        }
       });
     } catch (e) {
       setState(() {

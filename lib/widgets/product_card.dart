@@ -20,7 +20,7 @@ class ProductCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               spreadRadius: 1,
               blurRadius: 10,
               offset: const Offset(0, 1),
@@ -38,22 +38,39 @@ class ProductCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     child: Hero(
                       tag: product.id,
-                      child: Image.asset(
-                        product.imageUrl,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: AppThemes.secondaryColor,
-                            child: const Center(
-                              child: Icon(
-                                Icons.coffee,
-                                color: AppThemes.primaryColor,
-                              ),
+                      child: product.imageUrl.startsWith('http')
+                          ? Image.network(
+                              product.imageUrl,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: AppThemes.secondaryColor,
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.coffee,
+                                      color: AppThemes.primaryColor,
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                          : Image.asset(
+                              product.imageUrl,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: AppThemes.secondaryColor,
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.coffee,
+                                      color: AppThemes.primaryColor,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
                     ),
                   ),
                   // Rating display
@@ -66,7 +83,7 @@ class ProductCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
+                        color: Colors.black.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
