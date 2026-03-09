@@ -102,12 +102,30 @@ class _SignInScreenState extends State<SignInScreen> {
                       ),
                     );
                   }
+                } on FirebaseAuthException catch (e) {
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    String message;
+                    switch (e.code) {
+                      case 'invalid-email':
+                        message = 'Định dạng email không hợp lệ.';
+                        break;
+                      case 'user-not-found':
+                        message = 'Không tìm thấy tài khoản nào với email này.';
+                        break;
+                      default:
+                        message = 'Đã xảy ra lỗi: ${e.message}';
+                    }
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(message)));
+                  }
                 } catch (e) {
                   if (context.mounted) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Lỗi không xác định: $e')),
+                    );
                   }
                 }
               },

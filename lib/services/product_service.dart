@@ -143,9 +143,12 @@ class ProductService {
   // Get products stream
   static Stream<List<Product>> getProducts() {
     return _firestore.collection(_collection).snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return Product.fromMap(doc.data(), doc.id);
-      }).toList();
+      return snapshot.docs
+          .map((doc) {
+            return Product.fromMap(doc.data(), doc.id);
+          })
+          .where((product) => product.isAvailable)
+          .toList();
     });
   }
 
@@ -156,9 +159,12 @@ class ProductService {
         .where('category', isEqualTo: category)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs.map((doc) {
-            return Product.fromMap(doc.data(), doc.id);
-          }).toList();
+          return snapshot.docs
+              .map((doc) {
+                return Product.fromMap(doc.data(), doc.id);
+              })
+              .where((product) => product.isAvailable)
+              .toList();
         });
   }
 
