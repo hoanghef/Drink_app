@@ -5,9 +5,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
 
 class MoMoPaymentService {
-  // --- CREDENTIALS (MOMO SANDBOX) ---
-  // In a real app, keep these secured on your backend, not tightly coupled in standard client code.
-  // For sandbox/demo purposes, it's acceptable here.
   static const String partnerCode = 'MOMO';
   static const String accessKey = 'F8BBA842ECF85';
   static const String secretKey = 'K951B6PE1waPeJiGkQsK1u1g';

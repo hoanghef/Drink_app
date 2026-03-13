@@ -34,7 +34,11 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.product?.name ?? '');
     _priceController = TextEditingController(
-      text: widget.product != null ? widget.product!.price.toString() : '',
+      text: widget.product != null
+          ? widget.product!.price
+                .toStringAsFixed(0)
+                .replaceAll(RegExp(r'\B(?=(\d{3})+(?!\d))'), '.')
+          : '',
     );
     _descriptionController = TextEditingController(
       text: widget.product?.description ?? '',
@@ -80,7 +84,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
       return await storageRef.getDownloadURL();
     } catch (e) {
       debugPrint('Error uploading image: $e');
-      return null;
+      throw Exception('Lỗi Storage: $e');
     }
   }
 
@@ -88,10 +92,8 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_imageFile == null && _existingImageUrl == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn ảnh sản phẩm')),
-      );
-      return;
+      // Return a default image URL instead of blocking
+      _existingImageUrl = 'https://firebasestorage.googleapis.com/v0/b/coffee-app-f3cd9.appspot.com/o/products%2Fdefault_coffee.png?alt=media';
     }
 
     setState(() {
@@ -111,13 +113,11 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
       // Upload image
       final imageUrl = await _uploadImage(productId);
 
-      if (imageUrl == null) {
-        throw Exception('Không thể tải ảnh lên');
-      }
-
       final productData = {
         'name': _nameController.text.trim(),
-        'price': double.parse(_priceController.text.trim()),
+        'price': double.parse(
+          _priceController.text.trim().replaceAll(RegExp(r'[.,]'), ''),
+        ),
         'description': _descriptionController.text.trim(),
         'category': _categoryController.text.trim(),
         'imageURL': imageUrl,
@@ -164,7 +164,10 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isUpdating ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'),
+        title: Text(
+          isUpdating ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
       ),
       body: _isLoading
@@ -250,7 +253,10 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Vui lòng nhập giá';
                         }
-                        if (double.tryParse(value) == null) {
+                        if (double.tryParse(
+                              value.replaceAll(RegExp(r'[.,]'), ''),
+                            ) ==
+                            null) {
                           return 'Giá phải là số';
                         }
                         return null;
