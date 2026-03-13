@@ -69,6 +69,7 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
     } on FirebaseAuthException catch (e) {
       String errorMessage;
       switch (e.code) {
+        case 'invalid-credential':
         case 'wrong-password':
           errorMessage = 'Mật khẩu hiện tại không đúng';
           break;

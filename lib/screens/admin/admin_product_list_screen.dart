@@ -10,7 +10,13 @@ class AdminProductListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Quản lý Sản phẩm'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text(
+          'Quản lý Sản phẩm',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+      ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('products').snapshots(),
         builder: (context, snapshot) {
@@ -75,7 +81,9 @@ class AdminProductListScreen extends StatelessWidget {
                     product.name,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text('${product.price}đ • ${product.category}'),
+                  subtitle: Text(
+                    '${product.price.toStringAsFixed(0).replaceAll(RegExp(r'\B(?=(\d{3})+(?!\d))'), '.')}đ • ${product.category}',
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
