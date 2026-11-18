@@ -26,6 +26,7 @@ class Product {
       'description': description,
       'price': price,
       'imageUrl': imageUrl,
+      'imageURL': imageUrl, // Include both for compatibility
       'rating': rating,
       'category': category,
       'isAvailable': isAvailable,
@@ -38,7 +39,7 @@ class Product {
       name: map['name'] ?? '',
       description: map['description'] ?? '',
       price: (map['price'] ?? 0).toDouble(),
-      imageUrl: map['imageURL'] ?? '',
+      imageUrl: map['imageUrl'] ?? map['imageURL'] ?? '',
       rating: (map['rating'] ?? 0).toDouble(),
       category: map['category'] ?? map['type'] ?? '', // Backward compatibility
       isAvailable: map['isAvailable'] ?? true,

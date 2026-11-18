@@ -36,7 +36,6 @@ class OrderHistoryScreen extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('orders')
             .where('userId', isEqualTo: user.uid)
-            .orderBy('createdAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -67,7 +66,18 @@ class OrderHistoryScreen extends StatelessWidget {
             );
           }
 
-          final orders = snapshot.data!.docs;
+          final orders = snapshot.data!.docs.toList();
+          // Sort in memory to avoid requiring a composite index in Firestore
+          orders.sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+            final aTime = aData['createdAt'] as Timestamp?;
+            final bTime = bData['createdAt'] as Timestamp?;
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
+            return bTime.compareTo(aTime);
+          });
 
           return ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -190,14 +200,19 @@ class OrderHistoryScreen extends StatelessWidget {
 
     switch (status.toLowerCase()) {
       case 'completed':
+      case 'hoàn thành':
         backgroundColor = Colors.green.shade100;
         textColor = Colors.green.shade800;
         break;
       case 'processing':
+      case 'chờ xác nhận':
+      case 'đang pha chế':
+      case 'đang giao':
         backgroundColor = Colors.orange.shade100;
         textColor = Colors.orange.shade800;
         break;
       case 'cancelled':
+      case 'hủy':
         backgroundColor = Colors.red.shade100;
         textColor = Colors.red.shade800;
         break;

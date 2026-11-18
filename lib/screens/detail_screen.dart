@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:iconly/iconly.dart';
 import 'package:provider/provider.dart';
@@ -44,30 +45,38 @@ class _DetailScreenState extends State<DetailScreen> {
             color: AppThemes.secondaryColor, // Fallback color
             child: Hero(
               tag: widget.product.id,
-              child: widget.product.imageUrl.startsWith('http')
-                  ? Image.network(
-                      widget.product.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Center(
-                            child: Icon(
-                              Icons.coffee,
-                              size: 50,
-                              color: AppThemes.primaryColor,
-                            ),
-                          ),
-                    )
-                  : Image.asset(
-                      widget.product.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Center(
-                            child: Icon(
-                              Icons.coffee,
-                              size: 50,
-                              color: AppThemes.primaryColor,
-                            ),
-                          ),
+              child: widget.product.imageUrl.isNotEmpty
+                  ? (widget.product.imageUrl.startsWith('http')
+                      ? Image.network(
+                          widget.product.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Center(
+                                child: Icon(
+                                  Icons.coffee,
+                                  size: 50,
+                                  color: AppThemes.primaryColor,
+                                ),
+                              ),
+                        )
+                      : Image.asset(
+                          widget.product.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Center(
+                                child: Icon(
+                                  Icons.coffee,
+                                  size: 50,
+                                  color: AppThemes.primaryColor,
+                                ),
+                              ),
+                        ))
+                  : const Center(
+                      child: Icon(
+                        Icons.coffee,
+                        size: 50,
+                        color: AppThemes.primaryColor,
+                      ),
                     ),
             ),
           ),
@@ -93,11 +102,18 @@ class _DetailScreenState extends State<DetailScreen> {
                     return IconButton(
                       onPressed: () {
                         final userId = Provider.of<UserProvider>(
-                          context,
-                          listen: false,
-                        ).currentUser?.uid;
+                              context,
+                              listen: false,
+                            ).currentUser?.uid ??
+                            FirebaseAuth.instance.currentUser?.uid;
                         if (userId != null) {
                           favProvider.toggleFavorite(widget.product.id, userId);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Vui lòng đăng nhập để lưu món yêu thích'),
+                            ),
+                          );
                         }
                       },
                       icon: Icon(

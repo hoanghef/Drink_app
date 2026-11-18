@@ -84,6 +84,8 @@ class _OrderScreenState extends State<OrderScreen> {
       final orderId = orderRef.id;
 
       // Prepare order data
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+
       final orderData = {
         'userId': user.uid,
         'userEmail': user.email,
@@ -99,8 +101,15 @@ class _OrderScreenState extends State<OrderScreen> {
               },
             )
             .toList(),
-        'status': 'Processing', // default status
+        'status': 'Chờ xác nhận', // default status
         'isDelivery': isDelivery,
+        'deliveryAddress': isDelivery
+            ? {
+                'city': locationProvider.currentCity,
+                'detailedAddress': locationProvider.detailedAddress,
+                'fullAddress': locationProvider.fullAddress,
+              }
+            : null,
         'createdAt': FieldValue.serverTimestamp(),
         'paymentMethod': _selectedPaymentMethod,
         'isPaid': false, // initially false
@@ -355,30 +364,41 @@ class _OrderScreenState extends State<OrderScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: cartItem.product.imageUrl.startsWith('http')
-                            ? Image.network(
-                                cartItem.product.imageUrl,
+                        child: cartItem.product.imageUrl.isNotEmpty
+                            ? (cartItem.product.imageUrl.startsWith('http')
+                                ? Image.network(
+                                    cartItem.product.imageUrl,
+                                    width: 54,
+                                    height: 54,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            Container(
+                                              width: 54,
+                                              height: 54,
+                                              color: Colors.grey[200],
+                                              child: const Icon(Icons.coffee),
+                                            ),
+                                  )
+                                : Image.asset(
+                                    cartItem.product.imageUrl,
+                                    width: 54,
+                                    height: 54,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            Container(
+                                              width: 54,
+                                              height: 54,
+                                              color: Colors.grey[200],
+                                              child: const Icon(Icons.coffee),
+                                            ),
+                                  ))
+                            : Container(
                                 width: 54,
                                 height: 54,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Container(
-                                      width: 54,
-                                      height: 54,
-                                      color: Colors.grey,
-                                    ),
-                              )
-                            : Image.asset(
-                                cartItem.product.imageUrl,
-                                width: 54,
-                                height: 54,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Container(
-                                      width: 54,
-                                      height: 54,
-                                      color: Colors.grey,
-                                    ),
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.coffee),
                               ),
                       ),
                       const SizedBox(width: 12),

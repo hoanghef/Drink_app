@@ -34,9 +34,9 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
     super.initState();
     // Normalize old status formats if present
     String status = widget.orderData['status'] ?? 'Chờ xác nhận';
-    if (status == 'processing') status = 'Chờ xác nhận';
-    if (status == 'completed') status = 'Hoàn thành';
-    if (status == 'cancelled') status = 'Hủy';
+    if (status.toLowerCase() == 'processing') status = 'Chờ xác nhận';
+    if (status.toLowerCase() == 'completed') status = 'Hoàn thành';
+    if (status.toLowerCase() == 'cancelled') status = 'Hủy';
 
     _currentStatus = _statusOptions.contains(status) ? status : 'Chờ xác nhận';
   }
