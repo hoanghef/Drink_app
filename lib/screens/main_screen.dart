@@ -4,6 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../themes.dart';
 import '../providers/user_provider.dart';
+import '../providers/cart_provider.dart';
+import '../providers/location_provider.dart';
+import '../providers/favorites_provider.dart';
 import 'home_screen.dart';
 import 'favorite_screen.dart';
 import 'order_screen.dart';
@@ -36,10 +39,16 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      await Provider.of<UserProvider>(
-        context,
-        listen: false,
-      ).loadUserData(user.uid);
+      final cart = context.read<CartProvider>();
+      final favorites = context.read<FavoritesProvider>();
+      final locations = context.read<LocationProvider>();
+      final profile = context.read<UserProvider>();
+      cart.bindUser(user.uid);
+      final shouldLoadFavorites = favorites.uid != user.uid;
+      favorites.bindUser(user.uid);
+      await locations.bindUser(user.uid);
+      if (shouldLoadFavorites) await favorites.loadFavorites(user.uid);
+      await profile.loadUserData(user.uid);
     }
   }
 

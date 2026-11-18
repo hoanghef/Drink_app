@@ -40,38 +40,38 @@ class ProductCard extends StatelessWidget {
                       tag: product.id,
                       child: product.imageUrl.isNotEmpty
                           ? (product.imageUrl.startsWith('http')
-                              ? Image.network(
-                                  product.imageUrl,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: AppThemes.secondaryColor,
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.coffee,
-                                          color: AppThemes.primaryColor,
+                                ? Image.network(
+                                    product.imageUrl,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: AppThemes.secondaryColor,
+                                        child: const Center(
+                                          child: Icon(
+                                            Icons.coffee,
+                                            color: AppThemes.primaryColor,
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                                )
-                              : Image.asset(
-                                  product.imageUrl,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: AppThemes.secondaryColor,
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.coffee,
-                                          color: AppThemes.primaryColor,
+                                      );
+                                    },
+                                  )
+                                : Image.asset(
+                                    product.imageUrl,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: AppThemes.secondaryColor,
+                                        child: const Center(
+                                          child: Icon(
+                                            Icons.coffee,
+                                            color: AppThemes.primaryColor,
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                                ))
+                                      );
+                                    },
+                                  ))
                           : Container(
                               color: AppThemes.secondaryColor,
                               child: const Center(

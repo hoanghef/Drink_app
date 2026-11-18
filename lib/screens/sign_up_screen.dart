@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import '../models/user_model.dart';
 import '../providers/user_provider.dart';
 import '../providers/favorites_provider.dart';
+import '../providers/cart_provider.dart';
+import '../providers/location_provider.dart';
 import '../themes.dart';
 import '../widgets/custom_button.dart';
 import 'main_screen.dart';
@@ -85,6 +87,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
+    final favorites = context.read<FavoritesProvider>();
 
     try {
       // Create user in Firebase Auth
@@ -97,16 +100,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
       // Create user document in Firestore
       final user = UserModel(
         uid: userCredential.user!.uid,
-        email: _emailController.text.trim(),
+        email: userCredential.user!.email!,
         name: _nameController.text.trim(),
         role: 'user',
         createdAt: DateTime.now(),
       );
+      favorites.bindUser(user.uid);
 
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .set(user.toMap());
+      if (mounted) {
+        context.read<CartProvider>().bindUser(user.uid);
+        await context.read<LocationProvider>().bindUser(user.uid);
+      }
 
       // Load user data into Provider
       if (mounted) {

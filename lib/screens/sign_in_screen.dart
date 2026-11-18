@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/cart_provider.dart';
+import '../providers/location_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../themes.dart';
@@ -146,6 +148,7 @@ class _SignInScreenState extends State<SignInScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
+    final favorites = context.read<FavoritesProvider>();
 
     try {
       final userCredential = await FirebaseAuth.instance
@@ -153,6 +156,13 @@ class _SignInScreenState extends State<SignInScreen> {
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
           );
+      favorites.bindUser(userCredential.user!.uid);
+      if (mounted) {
+        context.read<CartProvider>().bindUser(userCredential.user!.uid);
+        await context.read<LocationProvider>().bindUser(
+          userCredential.user!.uid,
+        );
+      }
 
       // Load user data into Provider
       if (mounted) {

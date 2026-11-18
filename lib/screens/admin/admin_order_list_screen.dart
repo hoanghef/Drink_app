@@ -4,8 +4,15 @@ import 'package:intl/intl.dart';
 import '../../themes.dart';
 import 'admin_order_detail_screen.dart';
 
-class AdminOrderListScreen extends StatelessWidget {
+class AdminOrderListScreen extends StatefulWidget {
   const AdminOrderListScreen({super.key});
+
+  @override
+  State<AdminOrderListScreen> createState() => _AdminOrderListScreenState();
+}
+
+class _AdminOrderListScreenState extends State<AdminOrderListScreen> {
+  int retry = 0;
 
   String formatCurrency(double amount) {
     final formatter = NumberFormat('#,##0', 'vi_VN');
@@ -23,6 +30,7 @@ class AdminOrderListScreen extends StatelessWidget {
         centerTitle: true,
       ),
       body: StreamBuilder<QuerySnapshot>(
+        key: ValueKey(retry),
         stream: FirebaseFirestore.instance
             .collection('orders')
             .orderBy('createdAt', descending: true)
@@ -33,7 +41,18 @@ class AdminOrderListScreen extends StatelessWidget {
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Lỗi: ${snapshot.error}'));
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Không tải được đơn hàng'),
+                  TextButton(
+                    onPressed: () => setState(() => retry++),
+                    child: const Text('Thử lại'),
+                  ),
+                ],
+              ),
+            );
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -65,7 +84,10 @@ class AdminOrderListScreen extends StatelessWidget {
               final orderData = orders[index].data() as Map<String, dynamic>;
               final orderId = orders[index].id;
               final amount = orderData['amount'] ?? 0.0;
-              final status = orderData['status'] ?? 'processing';
+              final status =
+                  orderData['orderStatus'] ??
+                  orderData['status'] ??
+                  'processing';
               final isDelivery = orderData['isDelivery'] ?? true;
               final items = orderData['items'] as List<dynamic>? ?? [];
               final timestamp = orderData['createdAt'] as Timestamp?;

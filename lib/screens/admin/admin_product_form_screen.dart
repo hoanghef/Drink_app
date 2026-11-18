@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import '../../providers/category_provider.dart';
 import '../../models/product_model.dart';
 import '../../themes.dart';
 import '../../widgets/custom_button.dart';
@@ -22,7 +24,7 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
   late TextEditingController _nameController;
   late TextEditingController _priceController;
   late TextEditingController _descriptionController;
-  late TextEditingController _categoryController;
+  String? _categoryKey;
 
   bool _isLoading = false;
   File? _imageFile;
@@ -43,9 +45,10 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     _descriptionController = TextEditingController(
       text: widget.product?.description ?? '',
     );
-    _categoryController = TextEditingController(
-      text: widget.product?.category ?? '',
-    );
+    _categoryKey = widget.product?.category;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<CategoryProvider>().loadCategories();
+    });
 
     _existingImageUrl = widget.product?.imageUrl;
     _isAvailable = widget.product?.isAvailable ?? true;
@@ -56,7 +59,6 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     _nameController.dispose();
     _priceController.dispose();
     _descriptionController.dispose();
-    _categoryController.dispose();
     super.dispose();
   }
 
@@ -65,9 +67,30 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-      });
+      try {
+        final file = File(pickedFile.path);
+        final bytes = await file.openRead(0, 3).first;
+        final jpeg =
+            bytes.length == 3 &&
+            bytes[0] == 0xff &&
+            bytes[1] == 0xd8 &&
+            bytes[2] == 0xff;
+        if (!jpeg || await file.length() >= 5 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Chỉ chọn ảnh JPEG nhỏ hơn 5 MB')),
+            );
+          }
+          return;
+        }
+        if (mounted) setState(() => _imageFile = file);
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Không đọc được ảnh: $error')));
+        }
+      }
     }
   }
 
@@ -78,9 +101,12 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('products')
-          .child('$productId.jpg');
+          .child('${productId}_${DateTime.now().microsecondsSinceEpoch}.jpg');
 
-      await storageRef.putFile(_imageFile!);
+      await storageRef.putFile(
+        _imageFile!,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
       return await storageRef.getDownloadURL();
     } catch (e) {
       debugPrint('Error uploading image: $e');
@@ -90,10 +116,40 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
 
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) return;
+    QuerySnapshot<Map<String, dynamic>> categoryDocs;
+    try {
+      categoryDocs = await FirebaseFirestore.instance
+          .collection('categories')
+          .get();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không kiểm tra được danh mục: $error')),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    final keys = categoryDocs.docs
+        .where(
+          (doc) =>
+              doc.data()['isActive'] == true && doc.data()['name'] == doc.id,
+        )
+        .map((doc) => doc.data()['name'] as String?)
+        .toSet();
+    if (_categoryKey == null || !keys.contains(_categoryKey)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn danh mục hợp lệ')),
+      );
+      return;
+    }
 
-    if (_imageFile == null && _existingImageUrl == null) {
-      // Return a default image URL instead of blocking
-      _existingImageUrl = 'https://firebasestorage.googleapis.com/v0/b/coffee-app-f3cd9.appspot.com/o/products%2Fdefault_coffee.png?alt=media';
+    if (_imageFile == null &&
+        (_existingImageUrl == null || _existingImageUrl!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn ảnh sản phẩm')),
+      );
+      return;
     }
 
     setState(() {
@@ -115,11 +171,11 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
 
       final productData = {
         'name': _nameController.text.trim(),
-        'price': double.parse(
+        'price': int.parse(
           _priceController.text.trim().replaceAll(RegExp(r'[.,]'), ''),
         ),
         'description': _descriptionController.text.trim(),
-        'category': _categoryController.text.trim(),
+        'category': _categoryKey,
         'imageURL': imageUrl,
         'imageUrl': imageUrl, // Thêm cả 2 key để tương thích
         'isAvailable': _isAvailable,
@@ -253,16 +309,16 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Vui lòng nhập giá';
                         }
-                        if (double.tryParse(
-                              value.replaceAll(RegExp(r'[.,]'), ''),
-                            ) ==
-                            null) {
+                        final amount = int.tryParse(
+                          value.replaceAll(RegExp(r'[.,]'), ''),
+                        );
+                        if (amount == null || amount <= 0) {
                           return 'Giá phải là số';
                         }
                         return null;
                       },
                       decoration: InputDecoration(
-                        labelText: 'Giá (đ)',
+                        labelText: 'Giá size S (đ)',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -270,17 +326,58 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Category Field
-                    TextFormField(
-                      controller: _categoryController,
-                      validator: (value) =>
-                          value!.isEmpty ? 'Vui lòng nhập loại' : null,
-                      decoration: InputDecoration(
-                        labelText: 'Loại sản phẩm (vd: Cà phê, Trà...)',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+                    // Category key from Firestore; free text is not accepted.
+                    Consumer<CategoryProvider>(
+                      builder: (context, provider, _) {
+                        final categories = provider.categories;
+                        final value =
+                            categories.any(
+                              (c) => c.id == c.name && c.name == _categoryKey,
+                            )
+                            ? _categoryKey
+                            : null;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (provider.isLoading)
+                              const LinearProgressIndicator(),
+                            if (provider.errorMessage != null)
+                              Row(
+                                children: [
+                                  const Expanded(
+                                    child: Text('Không tải được danh mục'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => provider.loadCategories(
+                                      forceRefresh: true,
+                                    ),
+                                    child: const Text('Thử lại'),
+                                  ),
+                                ],
+                              ),
+                            DropdownButtonFormField<String>(
+                              key: ValueKey(value),
+                              initialValue: value,
+                              decoration: const InputDecoration(
+                                labelText: 'Danh mục',
+                              ),
+                              items: categories
+                                  .where((c) => c.id == c.name)
+                                  .map(
+                                    (c) => DropdownMenuItem(
+                                      value: c.name,
+                                      child: Text(c.displayName),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (key) =>
+                                  setState(() => _categoryKey = key),
+                              validator: (key) =>
+                                  key == null ? 'Chọn danh mục' : null,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
 

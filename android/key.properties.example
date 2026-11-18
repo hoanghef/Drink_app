@@ -1,0 +1,6 @@
+# Copy to android/key.properties, which Git ignores.
+# Use the path to your own keystore. Never commit passwords or the keystore.
+storeFile=path/to/your-release-key.jks
+storePassword=
+keyAlias=
+keyPassword=

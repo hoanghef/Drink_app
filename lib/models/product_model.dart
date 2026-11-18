@@ -1,3 +1,5 @@
+import '../utils/size_pricing.dart';
+
 class Product {
   final String id;
   final String name;
@@ -7,6 +9,9 @@ class Product {
   final double rating;
   final String category;
   final bool isAvailable;
+  final bool isArchived;
+
+  int priceForSize(String size) => SizePricing.price(price, size);
 
   Product({
     required this.id,
@@ -17,19 +22,28 @@ class Product {
     required this.rating,
     required this.category,
     this.isAvailable = true,
+    this.isArchived = false,
   });
 
   Map<String, dynamic> toMap() {
+    if (!price.isFinite || price <= 0 || price != price.roundToDouble()) {
+      throw ArgumentError.value(
+        price,
+        'price',
+        'Positive whole VND price required',
+      );
+    }
     return {
       'id': id,
       'name': name,
       'description': description,
-      'price': price,
+      'price': price.toInt(),
       'imageUrl': imageUrl,
       'imageURL': imageUrl, // Include both for compatibility
       'rating': rating,
       'category': category,
       'isAvailable': isAvailable,
+      'isArchived': isArchived,
     };
   }
 
@@ -43,6 +57,7 @@ class Product {
       rating: (map['rating'] ?? 0).toDouble(),
       category: map['category'] ?? map['type'] ?? '', // Backward compatibility
       isAvailable: map['isAvailable'] ?? true,
+      isArchived: map['isArchived'] == true,
     );
   }
 }

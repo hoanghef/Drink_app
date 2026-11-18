@@ -31,7 +31,26 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+**/build/
 /coverage/
+node_modules/
+functions/node_modules/
+functions/.env*
+**/.env
+**/.env.*
+!functions/.env.example
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.p8
+**/*.pem
+**/*.key
+**/key.properties
+**/firebase-export-*/
+**/emulator-data/
+.firebase/
+**/service-account*.json
+**/*private-key*.json
 
 # Symbolication related
 app.*.symbols

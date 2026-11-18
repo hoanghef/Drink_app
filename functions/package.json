@@ -1,0 +1,21 @@
+{
+  "name": "drink-app-functions",
+  "private": true,
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "seed:catalog": "node seed_catalog.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.5.0",
+    "firebase-functions": "^6.4.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase": "^12.4.0",
+    "firebase-tools": "^14.27.0"
+  }
+}

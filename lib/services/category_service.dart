@@ -41,7 +41,12 @@ class CategoryService {
               return null;
             }
           })
-          .where((category) => category != null && category.isActive)
+          .where(
+            (category) =>
+                category != null &&
+                category.isActive &&
+                category.id == category.name,
+          )
           .cast<CategoryModel>()
           .toList();
 
@@ -76,25 +81,25 @@ class CategoryService {
 
       final defaultCategories = [
         CategoryModel(
-          id: 'ca-phe-truyen-thong',
+          id: 'traditional',
           name: 'traditional',
           displayName: 'Cà phê truyền thống',
           order: 1,
         ),
         CategoryModel(
-          id: 'ca-phe-sua-beo',
+          id: 'milk',
           name: 'milk',
           displayName: 'Cà phê sữa & béo',
           order: 2,
         ),
         CategoryModel(
-          id: 'ca-phe-y',
+          id: 'espresso',
           name: 'espresso',
           displayName: 'Cà phê Ý (Espresso)',
           order: 3,
         ),
         CategoryModel(
-          id: 'ca-phe-dac-biet',
+          id: 'special',
           name: 'special',
           displayName: 'Cà phê đặc biệt',
           order: 4,

@@ -8,7 +8,7 @@ class OrderHistoryScreen extends StatelessWidget {
   const OrderHistoryScreen({super.key});
 
   // Format currency in Vietnamese style: 160.000đ
-  String formatCurrency(double amount) {
+  String formatCurrency(num amount) {
     final formatter = NumberFormat('#,##0', 'vi_VN');
     return '${formatter.format(amount)}đ';
   }
@@ -118,6 +118,10 @@ class OrderHistoryScreen extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 8),
+                        Text(
+                          'Thanh toán: ${orderData['paymentMethod'] ?? 'COD'} · '
+                          '${orderData['paymentStatus'] ?? ((orderData['isPaid'] == true) ? 'paid' : 'unpaid')}',
+                        ),
 
                         // Date
                         Row(
@@ -286,6 +290,11 @@ class OrderHistoryScreen extends StatelessWidget {
                 controller: scrollController,
                 padding: const EdgeInsets.all(16),
                 children: [
+                  Text(
+                    'Thanh toán: ${orderData['paymentMethod'] ?? 'COD'} · '
+                    '${orderData['paymentStatus'] ?? ((orderData['isPaid'] == true) ? 'paid' : 'unpaid')}',
+                  ),
+                  const SizedBox(height: 12),
                   // Delivery Address
                   if (deliveryAddress != null) ...[
                     const Text(
@@ -296,7 +305,7 @@ class OrderHistoryScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(deliveryAddress['fullAddress'] ?? ''),
+                    Text((deliveryAddress['fullAddress'] ?? '').toString()),
                     const SizedBox(height: 16),
                   ],
 
@@ -323,7 +332,7 @@ class OrderHistoryScreen extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  'Size: ${item['size']} | x${item['quantity']}',
+                                  'Size: ${item['size'] ?? 'M'} | x${item['quantity'] ?? 1}',
                                   style: TextStyle(
                                     color: Colors.grey[600],
                                     fontSize: 12,
@@ -333,7 +342,10 @@ class OrderHistoryScreen extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            formatCurrency(item['price'] * item['quantity']),
+                            formatCurrency(
+                              ((item['price'] as num?) ?? 0) *
+                                  ((item['quantity'] as num?) ?? 0),
+                            ),
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ],

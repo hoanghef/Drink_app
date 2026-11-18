@@ -4,6 +4,7 @@ import 'package:iconly/iconly.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_order_list_screen.dart';
 import 'admin_product_list_screen.dart';
+import 'admin_category_screen.dart';
 import 'admin_settings_screen.dart';
 import '../../themes.dart';
 
@@ -21,6 +22,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     const AdminDashboardScreen(),
     const AdminOrderListScreen(),
     const AdminProductListScreen(),
+    const AdminCategoryScreen(),
     const AdminSettingsScreen(),
   ];
 
@@ -53,6 +55,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             icon: Icon(IconlyLight.category),
             activeIcon: Icon(IconlyBold.category),
             label: 'Sản phẩm',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.category_outlined),
+            activeIcon: Icon(Icons.category),
+            label: 'Danh mục',
           ),
           BottomNavigationBarItem(
             icon: Icon(IconlyLight.setting),

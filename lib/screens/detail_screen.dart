@@ -47,30 +47,30 @@ class _DetailScreenState extends State<DetailScreen> {
               tag: widget.product.id,
               child: widget.product.imageUrl.isNotEmpty
                   ? (widget.product.imageUrl.startsWith('http')
-                      ? Image.network(
-                          widget.product.imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Center(
-                                child: Icon(
-                                  Icons.coffee,
-                                  size: 50,
-                                  color: AppThemes.primaryColor,
+                        ? Image.network(
+                            widget.product.imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Center(
+                                  child: Icon(
+                                    Icons.coffee,
+                                    size: 50,
+                                    color: AppThemes.primaryColor,
+                                  ),
                                 ),
-                              ),
-                        )
-                      : Image.asset(
-                          widget.product.imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Center(
-                                child: Icon(
-                                  Icons.coffee,
-                                  size: 50,
-                                  color: AppThemes.primaryColor,
+                          )
+                        : Image.asset(
+                            widget.product.imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Center(
+                                  child: Icon(
+                                    Icons.coffee,
+                                    size: 50,
+                                    color: AppThemes.primaryColor,
+                                  ),
                                 ),
-                              ),
-                        ))
+                          ))
                   : const Center(
                       child: Icon(
                         Icons.coffee,
@@ -100,26 +100,50 @@ class _DetailScreenState extends State<DetailScreen> {
                   builder: (context, favProvider, _) {
                     final isFav = favProvider.isFavorite(widget.product.id);
                     return IconButton(
-                      onPressed: () {
-                        final userId = Provider.of<UserProvider>(
-                              context,
-                              listen: false,
-                            ).currentUser?.uid ??
-                            FirebaseAuth.instance.currentUser?.uid;
-                        if (userId != null) {
-                          favProvider.toggleFavorite(widget.product.id, userId);
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Vui lòng đăng nhập để lưu món yêu thích'),
+                      onPressed: favProvider.isLoading || favProvider.isSaving
+                          ? null
+                          : () async {
+                              final userId =
+                                  FirebaseAuth.instance.currentUser?.uid ??
+                                  Provider.of<UserProvider>(
+                                    context,
+                                    listen: false,
+                                  ).currentUser?.uid;
+                              if (userId != null) {
+                                final saved = await favProvider.toggleFavorite(
+                                  widget.product.id,
+                                  userId,
+                                );
+                                if (!saved && context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        favProvider.errorMessage ??
+                                            'Không thể cập nhật món yêu thích. Vui lòng thử lại.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Vui lòng đăng nhập để lưu món yêu thích',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                      icon: favProvider.isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              isFav ? Icons.favorite : IconlyLight.heart,
+                              color: isFav ? Colors.red : Colors.white,
                             ),
-                          );
-                        }
-                      },
-                      icon: Icon(
-                        isFav ? Icons.favorite : IconlyLight.heart,
-                        color: isFav ? Colors.red : Colors.white,
-                      ),
                     );
                   },
                 ),
@@ -245,7 +269,7 @@ class _DetailScreenState extends State<DetailScreen> {
                             style: TextStyle(color: Colors.grey),
                           ),
                           Text(
-                            '${NumberFormat('#,###', 'vi_VN').format(widget.product.price)}đ',
+                            '${NumberFormat('#,###', 'vi_VN').format(widget.product.priceForSize(selectedSize))}đ',
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(
                                   color: AppThemes.primaryColor,

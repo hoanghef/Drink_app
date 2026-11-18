@@ -356,10 +356,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         final productsList = snapshot.data!;
                         // Filter by search query
+                        final activeKeys = context
+                            .watch<CategoryProvider>()
+                            .categories
+                            .map((category) => category.name)
+                            .toSet();
                         final filteredProducts = productsList.where((product) {
-                          return product.name.toLowerCase().contains(
-                            _searchQuery,
-                          );
+                          return activeKeys.contains(product.category) &&
+                              product.name.toLowerCase().contains(_searchQuery);
                         }).toList();
 
                         if (filteredProducts.isEmpty) {

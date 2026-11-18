@@ -8,10 +8,12 @@ import 'providers/location_provider.dart';
 import 'providers/category_provider.dart';
 import 'screens/onboarding_screen.dart';
 import 'themes.dart';
+import 'utils/size_pricing.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await SizePricing.load();
   runApp(const MyApp());
 }
 

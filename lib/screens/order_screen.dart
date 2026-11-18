@@ -1,15 +1,18 @@
+import 'dart:convert';
+import 'dart:math';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/cart_provider.dart';
 import '../providers/location_provider.dart';
-import '../widgets/delivery_address_dialog.dart';
 import '../themes.dart';
 import '../widgets/custom_button.dart';
-import '../services/momo_payment_service.dart';
 import 'main_screen.dart';
+import 'address_book_screen.dart';
 
 class OrderScreen extends StatefulWidget {
   const OrderScreen({super.key});
@@ -20,15 +23,92 @@ class OrderScreen extends StatefulWidget {
 
 class _OrderScreenState extends State<OrderScreen> {
   bool isDelivery = true; // Toggle state
-  String _selectedPaymentMethod = 'COD'; // Default: Cash on Delivery
   bool _isLoading = false;
+  bool _vnpayEnabled = false;
+  bool _vnpayChecking = true;
+  String _paymentMethod = 'COD';
+  String? _pendingRequestId;
+  String? _pendingSignature;
+  @override
+  void initState() {
+    super.initState();
+    _loadPaymentOptions();
+  }
 
-  void _showLoadingDialog(BuildContext context) {
-    showDialog(
+  Future<void> _loadPaymentOptions() async {
+    try {
+      final result = await FirebaseFunctions.instanceFor(
+        region: 'asia-southeast1',
+      ).httpsCallable('vnpayAvailability').call();
+      if (mounted) {
+        setState(() => _vnpayEnabled = result.data['enabled'] == true);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _vnpayEnabled = false);
+    } finally {
+      if (mounted) setState(() => _vnpayChecking = false);
+    }
+  }
+
+  void _showPaymentStatus(
+    BuildContext context,
+    String orderId,
+    CartProvider cart,
+  ) {
+    showDialog<void>(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Trạng thái thanh toán VNPay'),
+        content: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('orders')
+              .doc(orderId)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return const Text(
+                'Không tải được trạng thái. Kiểm tra lịch sử đơn hàng.',
+              );
+            }
+            final status =
+                snapshot.data?.data()?['paymentStatus'] as String? ?? 'pending';
+            if (status == 'paid' && cart.items.isNotEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => cart.clearCart(),
+              );
+            }
+            if (status == 'failed' || status == 'canceled') {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _pendingRequestId = null;
+                _pendingSignature = null;
+              });
+            }
+            final label = switch (status) {
+              'paid' => 'Đã thanh toán',
+              'canceled' => 'Thanh toán đã hủy',
+              'failed' => 'Thanh toán thất bại',
+              _ =>
+                'Đang chờ VNPay xác nhận. Bạn có thể xem lại trong lịch sử đơn hàng.',
+            };
+            return Text(label);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
     );
+  }
+
+  String _newRequestId() {
+    final random = Random.secure();
+    return List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
   }
 
   void _showSuccessDialog(BuildContext context) {
@@ -56,163 +136,111 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 
   Future<void> _submitOrder(BuildContext context, CartProvider cart) async {
-    if (cart.items.isEmpty) {
+    if (_isLoading || cart.items.isEmpty) return;
+    if (cart.items.values.any(
+          (item) =>
+              !item.product.isAvailable ||
+              item.quantity < 1 ||
+              item.quantity > 99 ||
+              item.product.priceForSize(item.size) <= 0,
+        ) ||
+        cart.totalAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Giỏ hàng trống. Vui lòng thêm sản phẩm.'),
+          content: Text('Giỏ hàng có sản phẩm hoặc số lượng không hợp lệ'),
         ),
       );
       return;
     }
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please login to order')));
+    if (FirebaseAuth.instance.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để đặt hàng')),
+      );
       return;
     }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      _showLoadingDialog(context);
-
-      final orderRef = FirebaseFirestore.instance.collection('orders').doc();
-      final orderId = orderRef.id;
-
-      // Prepare order data
-      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
-
-      final orderData = {
-        'userId': user.uid,
-        'userEmail': user.email,
-        'amount': cart.totalAmount,
-        'items': cart.items.values
-            .map(
-              (item) => {
-                'productId': item.product.id,
-                'productName': item.product.name,
-                'price': item.product.price,
-                'size': item.size,
-                'quantity': item.quantity,
-              },
-            )
-            .toList(),
-        'status': 'Chờ xác nhận', // default status
-        'isDelivery': isDelivery,
-        'deliveryAddress': isDelivery
-            ? {
-                'city': locationProvider.currentCity,
-                'detailedAddress': locationProvider.detailedAddress,
-                'fullAddress': locationProvider.fullAddress,
-              }
-            : null,
-        'createdAt': FieldValue.serverTimestamp(),
-        'paymentMethod': _selectedPaymentMethod,
-        'isPaid': false, // initially false
-      };
-
-      if (_selectedPaymentMethod == 'COD') {
-        // Proceed directly with COD
-        await orderRef.set(orderData);
-        if (!context.mounted) return;
-        Navigator.of(context).pop(); // Close loading
-        cart.clearCart();
-        _showSuccessDialog(context);
-      } else if (_selectedPaymentMethod == 'MOMO') {
-        // Handle MoMo Sandbox Payment Flow
-        final payUrl = await MoMoPaymentService.createMoMoPaymentResult(
-          cart.totalAmount,
-          orderId,
-        );
-
-        if (!context.mounted) return;
-        Navigator.of(context).pop(); // Close loading
-
-        if (payUrl != null) {
-          // Open MoMo Sandbox Payment Page
-          await MoMoPaymentService.launchPaymentUrl(payUrl);
-
-          if (!context.mounted) return;
-
-          // We prompt the user to simulate payment success since we are in sandbox and no true deep-link callback is setup
-          _showSimulateSimulatePaymentDialog(
-            context,
-            orderRef,
-            orderData,
-            cart,
-          );
-        } else {
-          if (!context.mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to generate MoMo Payment URL.'),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (!context.mounted) return;
-      Navigator.of(context).pop(); // close loading
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    final location = context.read<LocationProvider>();
+    if (isDelivery && location.defaultAddress == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập địa chỉ giao hàng')),
+      );
+      return;
     }
-  }
-
-  void _showSimulateSimulatePaymentDialog(
-    BuildContext context,
-    DocumentReference orderRef,
-    Map<String, dynamic> orderData,
-    CartProvider cart,
-  ) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Giả lập Thanh toán MoMo'),
-        content: const Text(
-          'Trong môi trường thử nghiệm (Sandbox), sau khi bạn hoàn tất trên app/web MoMo, xin hãy nhấn "Đã thanh toán thành công" để tiếp tục.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop(); // Cancel
+    setState(() => _isLoading = true);
+    try {
+      final items = cart.items.values
+          .map(
+            (item) => {
+              'productId': item.product.id,
+              'size': item.size,
+              'quantity': item.quantity,
             },
-            child: const Text('Hủy'),
+          )
+          .toList();
+      final address = isDelivery
+          ? {
+              'city': location.currentCity,
+              'detailedAddress': location.detailedAddress,
+            }
+          : null;
+      final signature = jsonEncode([
+        items,
+        isDelivery,
+        address,
+        cart.totalAmount,
+        _paymentMethod,
+      ]);
+      if (_pendingSignature != signature) {
+        _pendingSignature = signature;
+        _pendingRequestId = _newRequestId();
+      }
+      final result =
+          await FirebaseFunctions.instanceFor(region: 'asia-southeast1')
+              .httpsCallable(
+                _paymentMethod == 'VNPAY' ? 'createVnpayPayment' : 'placeOrder',
+              )
+              .call({
+                'requestId': _pendingRequestId,
+                'expectedAmount': cart.totalAmount.toInt(),
+                'items': items,
+                'isDelivery': isDelivery,
+                'deliveryAddress': address,
+              });
+      if (!context.mounted) return;
+      if (_paymentMethod == 'COD') {
+        cart.clearCart();
+        _pendingRequestId = null;
+        _pendingSignature = null;
+        _showSuccessDialog(context);
+      } else {
+        final data = Map<String, dynamic>.from(result.data as Map);
+        final orderId = data['orderId'] as String;
+        final payUrl = data['payUrl'] as String?;
+        if (payUrl != null) {
+          final opened = await launchUrl(
+            Uri.parse(payUrl),
+            mode: LaunchMode.externalApplication,
+          );
+          if (!opened) throw StateError('Cannot open VNPay payment page');
+        }
+        if (context.mounted) _showPaymentStatus(context, orderId, cart);
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message ?? 'Không thể đặt hàng')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không thể đặt hàng. Vui lòng thử lại.'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppThemes.primaryColor,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              _showLoadingDialog(context);
-
-              // Update orderData to reflect paid status
-              orderData['isPaid'] = true;
-              await orderRef.set(orderData);
-
-              if (!context.mounted) return;
-              Navigator.of(context).pop(); // Close loading
-              cart.clearCart();
-              _showSuccessDialog(context);
-            },
-            child: const Text('Đã thanh toán thành công'),
-          ),
-        ],
-      ),
-    );
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -304,7 +332,12 @@ class _OrderScreenState extends State<OrderScreen> {
                       ),
                     ),
                     TextButton.icon(
-                      onPressed: () => DeliveryAddressDialog.show(context),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AddressBookScreen(),
+                        ),
+                      ),
                       icon: const Icon(Icons.edit, size: 16),
                       label: const Text('Thay đổi'),
                       style: TextButton.styleFrom(
@@ -366,34 +399,34 @@ class _OrderScreenState extends State<OrderScreen> {
                         borderRadius: BorderRadius.circular(8),
                         child: cartItem.product.imageUrl.isNotEmpty
                             ? (cartItem.product.imageUrl.startsWith('http')
-                                ? Image.network(
-                                    cartItem.product.imageUrl,
-                                    width: 54,
-                                    height: 54,
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            Container(
-                                              width: 54,
-                                              height: 54,
-                                              color: Colors.grey[200],
-                                              child: const Icon(Icons.coffee),
-                                            ),
-                                  )
-                                : Image.asset(
-                                    cartItem.product.imageUrl,
-                                    width: 54,
-                                    height: 54,
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            Container(
-                                              width: 54,
-                                              height: 54,
-                                              color: Colors.grey[200],
-                                              child: const Icon(Icons.coffee),
-                                            ),
-                                  ))
+                                  ? Image.network(
+                                      cartItem.product.imageUrl,
+                                      width: 54,
+                                      height: 54,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              Container(
+                                                width: 54,
+                                                height: 54,
+                                                color: Colors.grey[200],
+                                                child: const Icon(Icons.coffee),
+                                              ),
+                                    )
+                                  : Image.asset(
+                                      cartItem.product.imageUrl,
+                                      width: 54,
+                                      height: 54,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              Container(
+                                                width: 54,
+                                                height: 54,
+                                                color: Colors.grey[200],
+                                                child: const Icon(Icons.coffee),
+                                              ),
+                                    ))
                             : Container(
                                 width: 54,
                                 height: 54,
@@ -418,6 +451,9 @@ class _OrderScreenState extends State<OrderScreen> {
                                 color: Colors.grey,
                                 fontSize: 12,
                               ),
+                            ),
+                            Text(
+                              '${NumberFormat('#,###', 'vi_VN').format(cartItem.product.priceForSize(cartItem.size))}đ / ly',
                             ),
                           ],
                         ),
@@ -459,123 +495,36 @@ class _OrderScreenState extends State<OrderScreen> {
 
           const Divider(),
 
-          // Payment Methods UI
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+          RadioGroup<String>(
+            groupValue: _paymentMethod,
+            onChanged: (value) {
+              if (!_isLoading && value != null) {
+                setState(() => _paymentMethod = value);
+              }
+            },
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Phương thức thanh toán',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                RadioListTile<String>(
+                  title: const Text('Thanh toán khi nhận hàng (COD)'),
+                  value: 'COD',
+                  enabled: !_isLoading,
                 ),
-                const SizedBox(height: 12),
-
-                // COD Option
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedPaymentMethod = 'COD';
-                    });
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _selectedPaymentMethod == 'COD'
-                          ? AppThemes.primaryColor.withValues(alpha: 0.1)
-                          : Colors.transparent,
-                      border: Border.all(
-                        color: _selectedPaymentMethod == 'COD'
-                            ? AppThemes.primaryColor
-                            : Colors.grey[300]!,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.money,
-                          color: _selectedPaymentMethod == 'COD'
-                              ? AppThemes.primaryColor
-                              : Colors.grey[600],
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Thanh toán khi nhận hàng (COD)',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        if (_selectedPaymentMethod == 'COD')
-                          const Icon(
-                            Icons.check_circle,
-                            color: AppThemes.primaryColor,
-                          ),
-                      ],
-                    ),
+                RadioListTile<String>(
+                  title: const Text('VNPay Sandbox'),
+                  subtitle: Text(
+                    _vnpayChecking
+                        ? 'Đang kiểm tra cấu hình'
+                        : _vnpayEnabled
+                        ? 'Thanh toán qua VNPay'
+                        : 'Chưa cấu hình VNPay Sandbox',
                   ),
-                ),
-
-                // MoMo Option
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedPaymentMethod = 'MOMO';
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _selectedPaymentMethod == 'MOMO'
-                          ? Colors.pink.withValues(alpha: 0.1)
-                          : Colors.transparent,
-                      border: Border.all(
-                        color: _selectedPaymentMethod == 'MOMO'
-                            ? Colors.pink
-                            : Colors.grey[300]!,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: Colors.pink,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'M',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Qua ví điện tử MoMo',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        if (_selectedPaymentMethod == 'MOMO')
-                          const Icon(Icons.check_circle, color: Colors.pink),
-                      ],
-                    ),
-                  ),
+                  value: 'VNPAY',
+                  enabled: _vnpayEnabled && !_isLoading,
                 ),
               ],
             ),
           ),
-
           const Divider(height: 32),
-
           // Payment Summary
           Padding(
             padding: const EdgeInsets.all(20),

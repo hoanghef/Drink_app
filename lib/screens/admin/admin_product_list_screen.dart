@@ -2,10 +2,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../models/product_model.dart';
 import '../../themes.dart';
+import '../../services/product_service.dart';
 import 'admin_product_form_screen.dart';
 
-class AdminProductListScreen extends StatelessWidget {
+class AdminProductListScreen extends StatefulWidget {
   const AdminProductListScreen({super.key});
+
+  @override
+  State<AdminProductListScreen> createState() => _AdminProductListScreenState();
+}
+
+class _AdminProductListScreenState extends State<AdminProductListScreen> {
+  int retry = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -18,6 +26,7 @@ class AdminProductListScreen extends StatelessWidget {
         centerTitle: true,
       ),
       body: StreamBuilder<QuerySnapshot>(
+        key: ValueKey(retry),
         stream: FirebaseFirestore.instance.collection('products').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -25,7 +34,18 @@ class AdminProductListScreen extends StatelessWidget {
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Lỗi: ${snapshot.error}'));
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Không tải được sản phẩm'),
+                  TextButton(
+                    onPressed: () => setState(() => retry++),
+                    child: const Text('Thử lại'),
+                  ),
+                ],
+              ),
+            );
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -88,12 +108,13 @@ class AdminProductListScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Switch(
-                        value: product.isAvailable,
+                        value: product.isAvailable && !product.isArchived,
                         activeThumbColor: AppThemes.primaryColor,
                         activeTrackColor: AppThemes.primaryColor.withValues(
                           alpha: 0.5,
                         ),
                         onChanged: (bool value) async {
+                          if (product.isArchived) return;
                           await FirebaseFirestore.instance
                               .collection('products')
                               .doc(product.id)
@@ -110,6 +131,49 @@ class AdminProductListScreen extends StatelessWidget {
                                   AdminProductFormScreen(product: product),
                             ),
                           );
+                        },
+                      ),
+                      IconButton(
+                        tooltip: product.isArchived
+                            ? 'Khôi phục'
+                            : 'Lưu trữ sản phẩm',
+                        icon: Icon(
+                          product.isArchived
+                              ? Icons.restore
+                              : Icons.archive_outlined,
+                        ),
+                        onPressed: () async {
+                          if (product.isArchived) {
+                            await FirebaseFirestore.instance
+                                .collection('products')
+                                .doc(product.id)
+                                .update({'isArchived': false});
+                            return;
+                          }
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (dialogContext) => AlertDialog(
+                              title: const Text('Lưu trữ sản phẩm?'),
+                              content: const Text(
+                                'Sản phẩm sẽ ngừng bán. Đơn cũ và ảnh vẫn được giữ.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(dialogContext, false),
+                                  child: const Text('Hủy'),
+                                ),
+                                FilledButton(
+                                  onPressed: () =>
+                                      Navigator.pop(dialogContext, true),
+                                  child: const Text('Lưu trữ'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirmed == true) {
+                            await ProductService.deleteProduct(product.id);
+                          }
                         },
                       ),
                     ],

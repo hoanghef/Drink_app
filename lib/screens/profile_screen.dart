@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
+import '../providers/cart_provider.dart';
+import '../providers/favorites_provider.dart';
+import '../providers/location_provider.dart';
 import '../themes.dart';
 import '../widgets/change_password_dialog.dart';
 import 'address_book_screen.dart';
@@ -12,6 +15,7 @@ class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   Future<void> _signOut(BuildContext context) async {
+    final favorites = context.read<FavoritesProvider>();
     // Show loading dialog
     showDialog(
       context: context,
@@ -21,10 +25,13 @@ class ProfileScreen extends StatelessWidget {
 
     try {
       await FirebaseAuth.instance.signOut();
+      favorites.clearFavorites();
 
       // Clear user data
       if (context.mounted) {
         Provider.of<UserProvider>(context, listen: false).clearUser();
+        context.read<CartProvider>().bindUser(null);
+        await context.read<LocationProvider>().bindUser(null);
       }
 
       // Navigate to sign in screen

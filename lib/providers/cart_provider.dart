@@ -17,6 +17,13 @@ class CartItem {
 
 class CartProvider with ChangeNotifier {
   final Map<String, CartItem> _items = {};
+  String? _uid;
+  // In-memory only. A different account starts with an empty cart.
+  void bindUser(String? uid) {
+    if (_uid == uid) return;
+    _uid = uid;
+    clearCart();
+  }
 
   Map<String, CartItem> get items {
     return {..._items};
@@ -29,7 +36,7 @@ class CartProvider with ChangeNotifier {
   double get totalAmount {
     var total = 0.0;
     _items.forEach((key, cartItem) {
-      total += cartItem.product.price * cartItem.quantity;
+      total += cartItem.product.priceForSize(cartItem.size) * cartItem.quantity;
     });
     return total;
   }

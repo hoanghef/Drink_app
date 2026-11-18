@@ -147,7 +147,7 @@ class ProductService {
           .map((doc) {
             return Product.fromMap(doc.data(), doc.id);
           })
-          .where((product) => product.isAvailable)
+          .where((product) => product.isAvailable && !product.isArchived)
           .toList();
     });
   }
@@ -163,7 +163,7 @@ class ProductService {
               .map((doc) {
                 return Product.fromMap(doc.data(), doc.id);
               })
-              .where((product) => product.isAvailable)
+              .where((product) => product.isAvailable && !product.isArchived)
               .toList();
         });
   }
@@ -180,6 +180,9 @@ class ProductService {
 
   // Delete product
   static Future<void> deleteProduct(String id) async {
-    await _firestore.collection(_collection).doc(id).delete();
+    await _firestore.collection(_collection).doc(id).update({
+      'isAvailable': false,
+      'isArchived': true,
+    });
   }
 }

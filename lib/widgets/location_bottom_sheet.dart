@@ -81,10 +81,10 @@ class LocationBottomSheet extends StatelessWidget {
                             ),
                             const SizedBox(width: 12),
                             ElevatedButton.icon(
-                              onPressed: () =>
-                                  locationProvider.initializeLocations(),
+                              onPressed: () => locationProvider
+                                  .loadAvailableLocations(forceRefresh: true),
                               icon: const Icon(Icons.add_location),
-                              label: const Text('Khởi tạo'),
+                              label: const Text('Tải lại'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.orange,
                                 foregroundColor: Colors.white,
@@ -117,10 +117,10 @@ class LocationBottomSheet extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
-                          onPressed: () =>
-                              locationProvider.initializeLocations(),
+                          onPressed: () => locationProvider
+                              .loadAvailableLocations(forceRefresh: true),
                           icon: const Icon(Icons.add_location),
-                          label: const Text('Khởi tạo dữ liệu'),
+                          label: const Text('Tải lại địa điểm'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppThemes.primaryColor,
                             foregroundColor: Colors.white,
