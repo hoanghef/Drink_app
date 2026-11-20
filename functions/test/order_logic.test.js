@@ -5,6 +5,7 @@ const { buildOrder } = require('../order_logic');
 
 const db = {
   collection: name => ({ doc: id => ({ name, id }) }),
+  findCategoriesByName: async () => [],
   getAll: async (...refs) => refs.map(ref => ({ id: ref.id,
     exists: ref.name === 'categories' ? ref.id === 'traditional' : ref.id === 'p1',
     data: () => ref.name === 'categories'
@@ -41,6 +42,7 @@ test('checkout rejects missing, inactive and mismatched category', async () => {
     { name: 'other', isActive: true }]) {
     const customDb = {
       ...db,
+      findCategoriesByName: async () => [],
       getAll: async (...refs) => refs.map(ref => ref.name === 'categories'
         ? { id: ref.id, exists: category !== null, data: () => category }
         : { id: ref.id, exists: true, data: () => ({ name: 'Coffee', price: 25000,
@@ -48,5 +50,27 @@ test('checkout rejects missing, inactive and mismatched category', async () => {
     };
     await assert.rejects(buildOrder(valid, 'u1', '', customDb, null),
       { code: 'failed-precondition' });
+  }
+});
+
+test('checkout accepts one active legacy category but rejects ambiguity', async () => {
+  const missingCanonical = {
+    ...db,
+    getAll: async (...refs) => refs.map(ref => ref.name === 'categories'
+      ? { id: ref.id, exists: false }
+      : { id: ref.id, exists: true, data: () => ({ name: 'Coffee',
+        price: 25000, category: 'traditional', isAvailable: true }) }),
+  };
+  const legacy = { id: 'ca-phe-truyen-thong', exists: true,
+    data: () => ({ name: 'traditional', isActive: true }) };
+  const order = await buildOrder(valid, 'u1', '', {
+    ...missingCanonical, findCategoriesByName: async () => [legacy],
+  }, null);
+  assert.equal(order.amount, 60000);
+  for (const matches of [[], [legacy, { ...legacy, id: 'other' }],
+    [{ id: legacy.id, data: () => ({ name: 'traditional', isActive: false }) }]]) {
+    await assert.rejects(buildOrder(valid, 'u1', '', {
+      ...missingCanonical, findCategoriesByName: async () => matches,
+    }, null), { code: 'failed-precondition' });
   }
 });

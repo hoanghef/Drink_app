@@ -143,12 +143,16 @@ class ProductService {
   // Get products stream
   static Stream<List<Product>> getProducts() {
     return _firestore.collection(_collection).snapshots().map((snapshot) {
-      return snapshot.docs
-          .map((doc) {
-            return Product.fromMap(doc.data(), doc.id);
-          })
-          .where((product) => product.isAvailable && !product.isArchived)
-          .toList();
+      final products = <Product>[];
+      for (final doc in snapshot.docs) {
+        try {
+          final product = Product.fromMap(doc.data(), doc.id);
+          if (product.isAvailable && !product.isArchived) products.add(product);
+        } catch (error) {
+          debugPrint('Skipping invalid product ${doc.id}: $error');
+        }
+      }
+      return products;
     });
   }
 

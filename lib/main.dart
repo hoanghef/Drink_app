@@ -6,7 +6,7 @@ import 'providers/user_provider.dart';
 import 'providers/favorites_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/category_provider.dart';
-import 'screens/onboarding_screen.dart';
+import 'screens/app_start_screen.dart';
 import 'themes.dart';
 import 'utils/size_pricing.dart';
 
@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'Coffee App',
         theme: AppThemes.lightTheme,
-        home: const OnboardingScreen(),
+        home: const AppStartScreen(),
       ),
     );
   }

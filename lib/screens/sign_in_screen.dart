@@ -195,6 +195,7 @@ class _SignInScreenState extends State<SignInScreen> {
         }
       }
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       setState(() {
         switch (e.code) {
           case 'invalid-email':
@@ -218,6 +219,12 @@ class _SignInScreenState extends State<SignInScreen> {
           default:
             _errorMessage = 'Đã xảy ra lỗi: ${e.message}';
         }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage =
+            'Đã đăng nhập nhưng chưa xác minh được quyền. Kiểm tra kết nối và thử lại.';
       });
     } finally {
       if (mounted) {

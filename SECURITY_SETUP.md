@@ -44,6 +44,9 @@ payment state.
 5. Seed the sample catalog with `npm run seed:catalog -- --project <project-id>
    --dry-run` from `functions/`. Review the operations, then run the same command
    with `--apply` only against the intended development project or Emulator.
+   For an existing product menu, use `--categories-only --dry-run` and then
+   `--categories-only --apply` to migrate category IDs without creating sample
+   products whose IDs differ from existing drinks.
    Without `FIRESTORE_EMULATOR_HOST`, the script uses Application Default
    Credentials; it never needs a service-account file in the repo. It creates
    missing categories/products without overwriting edited documents. Old
@@ -70,8 +73,12 @@ devices. The cart is in memory and clears when the signed-in UID changes.
 COD remains available without VNPay configuration. VNPay orders start with
 `paymentStatus: pending` and `isPaid: false`; COD orders start `unpaid`.
 Catalog rules require an active category document with ID equal to its key for
-every product write. Checkout also checks this category before accepting an
-order. Migrate legacy category IDs before editing their products.
+every product write. The app can display one active legacy category document
+with a matching `name` even when its ID differs. The updated checkout backend
+also verifies a unique active legacy category if no canonical document exists;
+an inactive canonical document takes precedence. Deploy the updated backend
+before testing checkout with legacy data. Migrate legacy category IDs before
+editing their products; viewing the menu itself does not require migration.
 
 ## VNPay Sandbox configuration (manual; not performed here)
 

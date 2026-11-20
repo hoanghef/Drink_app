@@ -44,6 +44,16 @@ async function buildOrder(data, uid, email, db, timestamp, paymentMethod = 'COD'
     .map(s => s.data().category).filter(key => typeof key === 'string'))];
   const categorySnapshots = await db.getAll(...categoryKeys.map(key => db.collection('categories').doc(key)));
   const categories = new Map(categorySnapshots.map(s => [s.id, s]));
+  const legacyCategories = new Map();
+  for (const key of categoryKeys) {
+    if (!/^[a-z][a-z0-9-]{1,39}$/.test(key))
+      throw new HttpsError('failed-precondition', 'Product category unavailable');
+    if (categories.get(key)?.exists) continue;
+    const matches = await db.findCategoriesByName(key);
+    if (matches.length === 1 && matches[0].id !== key &&
+        matches[0].data().name === key && matches[0].data().isActive === true)
+      legacyCategories.set(key, matches[0]);
+  }
   let amount = 0;
   const items = data.items.map(item => {
     const snap = products.get(item.productId);
@@ -52,7 +62,8 @@ async function buildOrder(data, uid, email, db, timestamp, paymentMethod = 'COD'
         !Number.isSafeInteger(product.price) || product.price <= 0 ||
         typeof product.name !== 'string' || !product.name)
       throw new HttpsError('failed-precondition', 'Product unavailable');
-    const category = categories.get(product.category);
+    const category = categories.get(product.category)?.exists
+      ? categories.get(product.category) : legacyCategories.get(product.category);
     if (!category?.exists || category.data().name !== product.category ||
         category.data().isActive !== true)
       throw new HttpsError('failed-precondition', 'Product category unavailable');

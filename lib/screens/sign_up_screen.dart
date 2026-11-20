@@ -147,6 +147,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }
       }
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       setState(() {
         switch (e.code) {
           case 'email-already-in-use':
@@ -170,8 +171,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _errorMessage = 'Đã xảy ra lỗi';
+        _errorMessage =
+            'Không thể hoàn tất đăng ký. Kiểm tra kết nối và thử lại.';
       });
     } finally {
       if (mounted) {

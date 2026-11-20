@@ -75,6 +75,12 @@ hoặc `FIRESTORE_EMULATOR_HOST`, tạo mục còn thiếu và chuyển ID categ
 sang key chuẩn mà không xóa document. Không chạy `--apply` trên dữ liệu thật
 trong CI. Node test `seed_catalog.test.js` kiểm tra plan idempotent; Emulator
 test kiểm tra product chỉ tham chiếu category đang hoạt động và ID khớp key.
+Thêm `--categories-only` khi chỉ cần chuẩn hóa ID danh mục để tránh tạo sản
+phẩm mẫu trùng với menu hiện có.
+Menu đọc một danh mục cũ đang hoạt động nếu `name` hợp lệ và không trùng;
+`home_catalog_test.dart` kiểm tra hiển thị, `order_logic.test.js` kiểm tra
+backend vẫn xác thực danh mục cũ trước checkout. Rules vẫn yêu cầu ID chuẩn
+cho mọi lần ghi sản phẩm mới.
 
 `flutter build apk --debug` kiểm tra Android debug. Release cần
 `android/key.properties` local theo `android/key.properties.example` và keystore

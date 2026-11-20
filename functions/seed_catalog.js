@@ -24,7 +24,7 @@ const products = [
   imageURL: `assets/images/${image}`, rating: 0,
   isAvailable: true, isArchived: false }));
 
-function planSeed(existingCategories, existingProducts) {
+function planSeed(existingCategories, existingProducts, { categoriesOnly = false } = {}) {
   const creates = [], updates = [], skippedProducts = [];
   const categoryState = new Map();
   for (const category of categories) {
@@ -52,13 +52,15 @@ function planSeed(existingCategories, existingProducts) {
         data: { isActive: false } });
     }
   }
-  for (const product of products) {
-    if (existingProducts.has(product.id)) continue;
-    if (categoryState.get(product.category)?.isActive !== true) {
-      skippedProducts.push(product.id);
-      continue;
+  if (!categoriesOnly) {
+    for (const product of products) {
+      if (existingProducts.has(product.id)) continue;
+      if (categoryState.get(product.category)?.isActive !== true) {
+        skippedProducts.push(product.id);
+        continue;
+      }
+      creates.push({ collection: 'products', id: product.id, data: product });
     }
-    creates.push({ collection: 'products', id: product.id, data: product });
   }
   return { creates, updates, skippedProducts };
 }
@@ -67,19 +69,19 @@ function snapshotMap(snapshot) {
   return new Map(snapshot.docs.map(doc => [doc.id, doc.data()]));
 }
 
-async function runSeed(db, apply) {
+async function runSeed(db, apply, options = {}) {
   if (!apply) {
     const [categorySnapshot, productSnapshot] = await Promise.all([
       db.collection('categories').get(), db.collection('products').get(),
     ]);
-    return planSeed(snapshotMap(categorySnapshot), snapshotMap(productSnapshot));
+    return planSeed(snapshotMap(categorySnapshot), snapshotMap(productSnapshot), options);
   }
   return db.runTransaction(async transaction => {
     const [categorySnapshot, productSnapshot] = await Promise.all([
       transaction.get(db.collection('categories')),
       transaction.get(db.collection('products')),
     ]);
-    const plan = planSeed(snapshotMap(categorySnapshot), snapshotMap(productSnapshot));
+    const plan = planSeed(snapshotMap(categorySnapshot), snapshotMap(productSnapshot), options);
     for (const item of plan.creates) {
       transaction.create(db.collection(item.collection).doc(item.id), item.data);
     }
@@ -94,16 +96,18 @@ async function main(args) {
   const projectIndex = args.indexOf('--project');
   const projectId = projectIndex >= 0 ? args[projectIndex + 1] : null;
   const apply = args.includes('--apply');
+  const categoriesOnly = args.includes('--categories-only');
   const allowed = args.every((arg, index) =>
     arg === '--project' || arg === '--apply' || arg === '--dry-run' ||
+    arg === '--categories-only' ||
     (index === projectIndex + 1 && arg === projectId));
   if (!projectId || !/^[a-z][a-z0-9-]{4,62}$/.test(projectId) ||
       !allowed || (apply && args.includes('--dry-run'))) {
-    throw new Error('Usage: node seed_catalog.js --project <project-id> [--dry-run | --apply]');
+    throw new Error('Usage: node seed_catalog.js --project <project-id> [--categories-only] [--dry-run | --apply]');
   }
   initializeApp({ projectId, ...(process.env.FIRESTORE_EMULATOR_HOST ? {} :
     { credential: applicationDefault() }) });
-  const plan = await runSeed(getFirestore(), apply);
+  const plan = await runSeed(getFirestore(), apply, { categoriesOnly });
   console.log(`${apply ? 'Applied' : 'Dry run'} on ${projectId}: ` +
     `${plan.creates.length} creates, ${plan.updates.length} legacy category hides, ` +
     `${plan.skippedProducts.length} products skipped (inactive category).`);

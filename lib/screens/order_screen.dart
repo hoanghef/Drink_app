@@ -136,7 +136,15 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 
   Future<void> _submitOrder(BuildContext context, CartProvider cart) async {
-    if (_isLoading || cart.items.isEmpty) return;
+    if (_isLoading) return;
+    if (cart.items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Giỏ hàng đang trống. Hãy chọn đồ uống trước.'),
+        ),
+      );
+      return;
+    }
     if (cart.items.values.any(
           (item) =>
               !item.product.isAvailable ||

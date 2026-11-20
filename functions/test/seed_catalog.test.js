@@ -29,6 +29,18 @@ test('legacy category IDs migrate without deleting documents or overwriting edit
   assert.equal(planSeed(existing, new Map()).updates.length, 0);
 });
 
+test('categories-only migration never creates sample products beside existing menu', () => {
+  const legacy = new Map(categories.map((category, index) => [
+    `old-${index}`, category,
+  ]));
+  const existingProducts = new Map([['custom-drink', { category: 'traditional' }]]);
+  const plan = planSeed(legacy, existingProducts, { categoriesOnly: true });
+  assert.equal(plan.creates.length, categories.length);
+  assert(plan.creates.every(item => item.collection === 'categories'));
+  assert.equal(plan.updates.length, categories.length);
+  assert.deepEqual(plan.skippedProducts, []);
+});
+
 test('inactive category is preserved and its missing products are skipped', () => {
   const existing = new Map([['milk', { name: 'milk', displayName: 'Hidden',
     order: 2, isActive: false }]]);

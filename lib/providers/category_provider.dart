@@ -3,11 +3,15 @@ import '../models/category_model.dart';
 import '../services/category_service.dart';
 
 class CategoryProvider with ChangeNotifier {
-  final CategoryService _categoryService = CategoryService();
+  CategoryProvider({CategoryService? service})
+    : _categoryService = service ?? CategoryService();
+
+  final CategoryService _categoryService;
 
   List<CategoryModel> _categories = [];
   bool _isLoading = false;
   String? _errorMessage;
+  int _loadVersion = 0;
 
   List<CategoryModel> get categories => _categories;
   bool get isLoading => _isLoading;
@@ -15,17 +19,21 @@ class CategoryProvider with ChangeNotifier {
 
   /// Load categories from Firestore
   Future<void> loadCategories({bool forceRefresh = false}) async {
+    final version = ++_loadVersion;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      _categories = await _categoryService.getCategories(
+      final categories = await _categoryService.getCategories(
         forceRefresh: forceRefresh,
       );
+      if (version != _loadVersion) return;
+      _categories = categories;
       _isLoading = false;
       notifyListeners();
     } catch (e) {
+      if (version != _loadVersion) return;
       _errorMessage = 'Không thể tải danh mục';
       _isLoading = false;
       debugPrint('Error loading categories: $e');

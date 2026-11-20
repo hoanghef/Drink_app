@@ -11,7 +11,9 @@ import '../providers/category_provider.dart';
 import 'detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.productsStream});
+
+  final Stream<List<Product>>? productsStream;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -21,15 +23,35 @@ class _HomeScreenState extends State<HomeScreen> {
   String? selectedCategory;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  late Stream<List<Product>> _productsStream;
 
   @override
   void initState() {
     super.initState();
-    // Load categories on init
+    _productsStream = widget.productsStream ?? ProductService.getProducts();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<CategoryProvider>(context, listen: false).loadCategories();
+      if (mounted) {
+        context.read<CategoryProvider>().loadCategories(forceRefresh: true);
+      }
     });
   }
+
+  void _retryCatalog() {
+    setState(() {
+      _productsStream = widget.productsStream ?? ProductService.getProducts();
+    });
+    context.read<CategoryProvider>().loadCategories(forceRefresh: true);
+  }
+
+  Widget _catalogMessage(String message) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(message, textAlign: TextAlign.center),
+        TextButton(onPressed: _retryCatalog, child: const Text('Thử lại')),
+      ],
+    ),
+  );
 
   @override
   void dispose() {
@@ -218,8 +240,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       final categories = categoryProvider.categories;
 
-                      // Set initial selected category to "all"
                       selectedCategory ??= 'all';
+                      if (selectedCategory != 'all' &&
+                          !categories.any(
+                            (item) => item.name == selectedCategory,
+                          )) {
+                        selectedCategory = 'all';
+                      }
 
                       return SizedBox(
                         height: 40,
@@ -332,13 +359,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: StreamBuilder<List<Product>>(
-                      stream:
-                          selectedCategory == null || selectedCategory == 'all'
-                          ? ProductService.getProducts()
-                          : ProductService.getProductsByCategory(
-                              selectedCategory!,
-                            ),
+                      stream: _productsStream,
                       builder: (context, snapshot) {
+                        final categoryProvider = context
+                            .watch<CategoryProvider>();
+                        if (categoryProvider.isLoading) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (categoryProvider.errorMessage != null) {
+                          return _catalogMessage(
+                            'Không thể tải danh mục. Kiểm tra kết nối và thử lại.',
+                          );
+                        }
+                        if (categoryProvider.categories.isEmpty) {
+                          return _catalogMessage(
+                            'Chưa có danh mục hoạt động. Quản trị viên cần tạo danh mục hoặc chạy seed catalog.',
+                          );
+                        }
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
                           return const Center(
@@ -346,27 +385,35 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
                         }
                         if (snapshot.hasError) {
-                          return Center(
-                            child: Text('Error: ${snapshot.error}'),
+                          return _catalogMessage(
+                            'Không thể tải sản phẩm. Kiểm tra kết nối và thử lại.',
                           );
                         }
                         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return const Center(child: Text('Chưa có sản phẩm'));
+                          return _catalogMessage(
+                            'Chưa có sản phẩm đang bán. Quản trị viên cần thêm sản phẩm hoặc chạy seed catalog.',
+                          );
                         }
 
                         final productsList = snapshot.data!;
                         // Filter by search query
-                        final activeKeys = context
-                            .watch<CategoryProvider>()
-                            .categories
+                        final activeKeys = categoryProvider.categories
                             .map((category) => category.name)
                             .toSet();
                         final filteredProducts = productsList.where((product) {
                           return activeKeys.contains(product.category) &&
+                              (selectedCategory == 'all' ||
+                                  product.category == selectedCategory) &&
                               product.name.toLowerCase().contains(_searchQuery);
                         }).toList();
 
                         if (filteredProducts.isEmpty) {
+                          if (_searchQuery.isEmpty &&
+                              selectedCategory == 'all') {
+                            return _catalogMessage(
+                              'Sản phẩm chưa thuộc danh mục đang hoạt động. Kiểm tra key danh mục và dữ liệu seed.',
+                            );
+                          }
                           return const Center(
                             child: Text('Không tìm thấy sản phẩm'),
                           );

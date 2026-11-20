@@ -48,7 +48,19 @@ class _MainScreenState extends State<MainScreen> {
       favorites.bindUser(user.uid);
       await locations.bindUser(user.uid);
       if (shouldLoadFavorites) await favorites.loadFavorites(user.uid);
-      await profile.loadUserData(user.uid);
+      try {
+        await profile.loadUserData(user.uid);
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Không thể làm mới quyền tài khoản. Vui lòng thử đăng nhập lại.',
+              ),
+            ),
+          );
+        }
+      }
     }
   }
 

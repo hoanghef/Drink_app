@@ -25,6 +25,10 @@ async function placeOrder(data, auth, db, timestamp, paymentMethod = 'COD') {
     const transactionalDb = {
       collection: name => db.collection(name),
       getAll: (...refs) => tx.getAll(...refs),
+      findCategoriesByName: async key => {
+        const query = db.collection('categories').where('name', '==', key).limit(2);
+        return (await tx.get(query)).docs;
+      },
     };
     const order = await buildOrder(data, auth.uid, auth.token.email,
       transactionalDb, timestamp, paymentMethod);

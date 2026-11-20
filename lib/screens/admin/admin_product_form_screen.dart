@@ -47,7 +47,9 @@ class _AdminProductFormScreenState extends State<AdminProductFormScreen> {
     );
     _categoryKey = widget.product?.category;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<CategoryProvider>().loadCategories();
+      if (mounted) {
+        context.read<CategoryProvider>().loadCategories(forceRefresh: true);
+      }
     });
 
     _existingImageUrl = widget.product?.imageUrl;

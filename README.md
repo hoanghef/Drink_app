@@ -3,15 +3,16 @@
 Dự án portfolio Flutter Intern: ứng dụng đặt đồ uống có giao diện khách hàng và
 quản trị viên. Flutter xử lý giao diện và state với Provider; Firebase Auth,
 Firestore, Storage và Cloud Functions phục vụ đăng nhập, menu, đơn hàng và ảnh.
-Backend tính lại giá theo size trước khi tạo đơn. COD và tích hợp **VNPay Sandbox**
-có trong source, nhưng **chưa được kiểm chứng bằng giao dịch Sandbox trên Firebase
-thật** trong repository này.
+Backend tính lại giá theo size trước khi tạo đơn. Mã nguồn và bộ kiểm thử cục bộ (Flutter unit/widget tests, Node unit tests, Emulator rules) cho đặt hàng COD và tích hợp **VNPay Sandbox** đã hoàn thành; tuy nhiên, **Cloud Functions, luồng đặt hàng COD thực tế và VNPay Sandbox chưa được chứng minh hoạt động trên Firebase development hoặc tài khoản Sandbox thật** trong repository này.
 
-Chưa có ảnh chụp màn hình được lưu trong repo. Chủ dự án có thể bổ sung ảnh chụp
-thật của các màn User, checkout và Admin vào `docs/screenshots/` rồi liên kết ở
-đây. Các ảnh sản phẩm trong `assets/images/` là asset giao diện, không phải ảnh
-chụp ứng dụng. README chưa có CI badge vì workflow chưa được xác minh sau khi
-đưa lên GitHub.
+## 📱 Screenshots
+
+> [!NOTE]
+> Chưa có ảnh chụp màn hình được lưu trong repo. Chủ dự án có thể bổ sung ảnh chụp thật của các màn User, checkout và Admin vào thư mục `docs/screenshots/` rồi liên kết ở đây. Không dùng ảnh giả. Các ảnh sản phẩm trong `assets/images/` là asset mẫu giao diện, không phải ảnh chụp ứng dụng. README không dùng CI badge hoặc demo link chưa được xác minh trực tiếp trên GitHub/Production.
+
+| Trang chủ (Menu) | Chi tiết món & Size | Giỏ hàng & Checkout (COD / VNPay) | Lịch sử đơn hàng | Quản trị viên (Admin) |
+|:---:|:---:|:---:|:---:|:---:|
+| *(Thêm `home.png`)* | *(Thêm `detail.png`)* | *(Thêm `checkout.png`)* | *(Thêm `orders.png`)* | *(Thêm `admin.png`)* |
 
 ## Chức năng có trong source
 
@@ -80,10 +81,36 @@ npm run seed:catalog -- --project <development-project-id> --apply
 
 `--dry-run` chỉ đọc và liệt kê thao tác; `--apply` cần Application Default
 Credentials có quyền ghi hoặc `FIRESTORE_EMULATOR_HOST`. Chọn đúng project trước
-khi apply. Lệnh chỉ tạo category/product còn thiếu, không ghi đè menu đã chỉnh;
+khi apply. Lệnh chỉ tạo category/product còn thiếu theo ID mẫu, không ghi đè menu
+đã chỉnh. Nếu menu hiện có dùng ID sản phẩm khác, lệnh đầy đủ có thể tạo thêm
+sản phẩm mẫu cùng tên; cần xem danh sách `products/*` trong dry-run trước khi apply.
+Menu User đọc được danh mục cũ có ID khác key nếu `name` hợp lệ, đang hoạt
+động và không trùng key. Không cần chạy seed để xem menu. Để **chuẩn hóa danh
+mục cho thao tác ghi catalog của Admin** mà giữ nguyên menu sản phẩm, dùng:
+
+```sh
+npm run seed:catalog -- --project <development-project-id> --categories-only --dry-run
+npm run seed:catalog -- --project <development-project-id> --categories-only --apply
+```
+
 category seed cũ có document ID khác key được sao chép sang ID chuẩn và document
 cũ được ẩn, không xóa. Xem [SECURITY_SETUP.md](SECURITY_SETUP.md) để kiểm tra
 kết quả và xử lý trường hợp category đang ẩn.
+
+### Khi trang chủ trống hoặc không vào được Admin
+
+- App không tự thêm sản phẩm. Nếu trang chủ báo chưa có danh mục/sản phẩm, kiểm
+  tra đúng Firebase project trong `android/app/google-services.json`. Danh mục
+  phải đang hoạt động và `products.category` phải tham chiếu `name` của nó.
+  Document ID cũ vẫn đọc được để hiện menu, nhưng cần chuẩn hóa ID trước khi
+  Admin tạo/sửa sản phẩm theo Firestore rules hiện tại.
+- Đăng ký tài khoản chỉ tạo User. Để vào Admin, cấp custom claim bằng công cụ
+  quản trị tin cậy theo [SECURITY_SETUP.md](SECURITY_SETUP.md), trên **cùng**
+  Firebase project với app. Sau đó đăng xuất/đăng nhập lại hoặc mở lại app để
+  làm mới ID token. Sửa `users.role` không cấp quyền Admin.
+- Lỗi tải dữ liệu hoặc xác minh quyền nay có thông báo và nút thử lại; nếu vẫn
+  xảy ra, kiểm tra kết nối, rules đã deploy và project ID. Không đưa credential
+  quản trị vào app để khắc phục.
 
 ### Android build
 
@@ -129,13 +156,9 @@ hổng ở [CONTRIBUTING.md](CONTRIBUTING.md) và [SECURITY.md](SECURITY.md).
 
 ## Giới hạn đã biết
 
-- Địa chỉ không đồng bộ giữa thiết bị. Favorites đã có test cho đổi tài
-  khoản, document rỗng, response tải muộn và lỗi ghi; chưa thử luồng này với
-  nhiều thiết bị hoặc Firebase thật.
-- Đơn VNPay `pending` có thể kéo dài khi IPN/query không cho kết quả rõ ràng;
-  cần đối soát thủ công theo `SECURITY_SETUP.md`. Không sửa trạng thái thanh
-  toán trực tiếp từ client.
-- Chạy `npm audit --omit=dev` trong `functions/` để xem advisory hiện tại;
-  hướng xử lý và giới hạn dependency nằm trong `TESTING.md`.
-- Repo chưa có license và chưa có ảnh chụp ứng dụng thật được commit. Cần chủ
-  repo chọn license và cung cấp ảnh nếu muốn công bố hai mục này.
+- **Triển khai live:** Source và test local cho COD, VNPay Sandbox (HMAC-SHA512, IPN, reconcile) và Cloud Functions đã hoàn thành trong repo và vượt qua 100% tests cục bộ (30 Flutter tests, 32 Node tests, 39 Emulator tests, Android debug build thành công). Tuy nhiên, Cloud Functions, quy trình COD và giao dịch VNPay chưa được chứng minh hoạt động trên Firebase development hoặc merchant Sandbox thật.
+- **Bảo mật và lịch sử Git:** Credential MoMo cũ (trong commit `5e1afdd` tại `lib/services/momo_payment_service.dart`) đã được chủ sở hữu revoke/vô hiệu hóa. Tuy nhiên, do repository GitHub đã tồn tại trực tuyến, lịch sử Git vẫn còn lưu vết commit cũ và cần được chủ repo xử lý (sử dụng công cụ viết lại lịch sử như `git-filter-repo` để loại bỏ hoàn toàn); việc xóa tệp ở `HEAD` không đồng nghĩa lịch sử Git đã an toàn.
+- Địa chỉ không đồng bộ giữa thiết bị. Favorites đã có test cho đổi tài khoản, document rỗng, response tải muộn và lỗi ghi; chưa thử luồng này với nhiều thiết bị hoặc Firebase thật.
+- Đơn VNPay `pending` có thể kéo dài khi IPN/query không cho kết quả rõ ràng; cần đối soát thủ công theo `SECURITY_SETUP.md`. Không sửa trạng thái thanh toán trực tiếp từ client.
+- Chạy `npm audit --omit=dev` trong `functions/` để xem advisory hiện tại; hướng xử lý và giới hạn dependency nằm trong `TESTING.md`.
+- Repo chưa có license và chưa có ảnh chụp ứng dụng thật được commit. Cần chủ repo chọn license và cung cấp ảnh nếu muốn công bố hai mục này.

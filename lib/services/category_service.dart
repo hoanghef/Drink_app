@@ -3,13 +3,41 @@ import 'package:flutter/foundation.dart';
 import '../models/category_model.dart';
 
 class CategoryService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
   static const String _collectionName = 'categories';
 
   // Cache categories
   List<CategoryModel>? _cachedCategories;
   DateTime? _lastFetchTime;
   static const Duration _cacheDuration = Duration(hours: 1);
+
+  /// Keep old category documents readable until their IDs are migrated.
+  /// A canonical document always wins, including when it is hidden.
+  @visibleForTesting
+  static List<CategoryModel> visibleCategories(
+    Iterable<CategoryModel> documents,
+  ) {
+    final byKey = <String, List<CategoryModel>>{};
+    final validKey = RegExp(r'^[a-z][a-z0-9-]{1,39}$');
+    for (final category in documents) {
+      if (validKey.hasMatch(category.name)) {
+        byKey.putIfAbsent(category.name, () => []).add(category);
+      }
+    }
+
+    final visible = <CategoryModel>[];
+    for (final group in byKey.values) {
+      final canonical = group.where((category) => category.id == category.name);
+      final category = canonical.isNotEmpty
+          ? canonical.single
+          : group.length == 1
+          ? group.single
+          : null;
+      if (category != null && category.isActive) visible.add(category);
+    }
+    visible.sort((a, b) => a.order.compareTo(b.order));
+    return visible;
+  }
 
   /// Fetch all active categories from Firestore
   Future<List<CategoryModel>> getCategories({bool forceRefresh = false}) async {
@@ -31,7 +59,7 @@ class CategoryService {
       debugPrint('Got ${querySnapshot.docs.length} category documents');
 
       // Filter and map
-      final categories = querySnapshot.docs
+      final documents = querySnapshot.docs
           .map((doc) {
             try {
               final category = CategoryModel.fromFirestore(doc.data(), doc.id);
@@ -41,17 +69,10 @@ class CategoryService {
               return null;
             }
           })
-          .where(
-            (category) =>
-                category != null &&
-                category.isActive &&
-                category.id == category.name,
-          )
+          .where((category) => category != null)
           .cast<CategoryModel>()
           .toList();
-
-      // Sort by order
-      categories.sort((a, b) => a.order.compareTo(b.order));
+      final categories = visibleCategories(documents);
 
       debugPrint('Filtered to ${categories.length} active categories');
 
@@ -62,7 +83,7 @@ class CategoryService {
       return categories;
     } catch (e) {
       debugPrint('Error fetching categories: $e');
-      if (_cachedCategories != null) {
+      if (!forceRefresh && _cachedCategories != null) {
         debugPrint('Returning cached categories due to error');
         return _cachedCategories!;
       }

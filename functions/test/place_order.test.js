@@ -3,19 +3,28 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { placeOrder } = require('../place_order');
 
-function mockDb() {
+function mockDb({ legacyCategory = false } = {}) {
   const orders = new Map();
   const getAll = async (...refs) => refs.map(ref => ({ id: ref.id, exists: true,
+    ...(ref.name === 'categories' && legacyCategory ? { exists: false } : {}),
     data: () => ref.name === 'categories'
       ? { name: 'traditional', isActive: true }
       : { name: 'Coffee', price: 25000, category: 'traditional', isAvailable: true } }));
   const db = {
-    collection: name => ({ doc: id => ({ name, id, get: async () => ({
-      exists: orders.has(id), data: () => orders.get(id),
-    }) }) }),
+    collection: name => ({
+      doc: id => ({ name, id, get: async () => ({
+        exists: orders.has(id), data: () => orders.get(id),
+      }) }),
+      where: (field, op, key) => ({
+        limit: count => ({ name, field, op, key, count }),
+      }),
+    }),
     getAll,
     runTransaction: async fn => fn({
-      get: async ref => ({ exists: orders.has(ref.id), data: () => orders.get(ref.id) }),
+      get: async ref => ref.field === 'name'
+        ? { docs: legacyCategory ? [{ id: 'ca-phe-truyen-thong', exists: true,
+          data: () => ({ name: ref.key, isActive: true }) }] : [] }
+        : { exists: orders.has(ref.id), data: () => orders.get(ref.id) },
       getAll,
       create: (ref, value) => orders.set(ref.id, value),
     }),
@@ -35,6 +44,14 @@ test('retry returns the same order and never creates a second', async () => {
   assert.equal(orders.size, 1);
   assert.equal(orders.values().next().value.items[0].price, 30000);
   await assert.rejects(placeOrder({ ...payload, expectedAmount: 1 }, auth, db, 'later'));
+  assert.equal(orders.size, 1);
+});
+
+test('existing legacy category is checked inside transaction without duplicate orders', async () => {
+  const { db, orders } = mockDb({ legacyCategory: true });
+  const first = await placeOrder(payload, auth, db, 'now');
+  const retry = await placeOrder(payload, auth, db, 'later');
+  assert.deepEqual(retry, first);
   assert.equal(orders.size, 1);
 });
 test('invalid checkout creates no order', async () => {
