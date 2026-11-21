@@ -13,11 +13,9 @@ Khi có kênh riêng, báo cáo nên gồm phiên bản/commit, ảnh hưởng, 
 an toàn bằng Emulator hoặc test doubles và đề xuất khắc phục. Không gửi
 service-account, secret VNPay hay dữ liệu thật trong báo cáo.
 
-**Rủi ro lịch sử Git:** commit `5e1afdd` chứa các phép gán literal cho
-`partnerCode`, `accessKey` và `secretKey` trong
-`lib/services/momo_payment_service.dart`; mẫu phép gán vẫn có trong bản của
-file ở `HEAD`. File đã được xóa trong working tree hiện tại nhưng vẫn có trong
-lịch sử Git. Chủ sở hữu nên thu hồi/rotate
-mọi credential MoMo liên quan. VNPay sử dụng credential Sandbox mới và chỉ lưu
-qua Firebase Secret Manager. Không dùng việc xóa file hiện tại như bằng chứng
-credential cũ đã an toàn; lịch sử Git chưa được viết lại.
+**Lịch sử Git:** Toàn bộ lịch sử Git reachable từ `main` và `origin/main`
+đã được kiểm tra: commit `5e1afdd` không tồn tại, tệp
+`lib/services/momo_payment_service.dart` chưa từng được commit vào lịch sử được theo dõi,
+và không có literal credential MoMo nào trong các commit reachable. Tích hợp thanh toán
+trong source hiện tại chỉ sử dụng VNPay Sandbox và secret chỉ được cấu hình qua
+Firebase Secret Manager/biến môi trường backend, không lưu trong client.
